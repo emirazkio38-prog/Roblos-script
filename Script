@@ -1,0 +1,1003 @@
+
+-- MINI GAME HUB 3-IN-1
+-- Flappy Bird + Snake + Brick Breaker
+-- Satu LocalScript di StarterPlayer > StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local old = playerGui:FindFirstChild("MiniGameHub")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "MiniGameHub"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.DisplayOrder = 50
+gui.Parent = playerGui
+
+local function make(class, name, parent, props)
+    local obj = Instance.new(class)
+    obj.Name = name
+    for k, v in pairs(props or {}) do
+        obj[k] = v
+    end
+    obj.Parent = parent
+    return obj
+end
+
+local function round(obj, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = obj
+end
+
+local function stroke(obj, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color or Color3.new(1, 1, 1)
+    s.Thickness = thickness or 2
+    s.Parent = obj
+end
+
+local function label(parent, name, text, pos, size, color, font)
+    return make("TextLabel", name, parent, {
+        Position = pos,
+        Size = size,
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = color or Color3.new(1, 1, 1),
+        Font = font or Enum.Font.GothamBold,
+        TextScaled = true
+    })
+end
+
+local function button(parent, name, text, pos, size, color)
+    local b = make("TextButton", name, parent, {
+        Position = pos,
+        Size = size,
+        BackgroundColor3 = color,
+        Text = text,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBlack,
+        TextScaled = true,
+        BorderSizePixel = 0,
+        AutoButtonColor = true
+    })
+    round(b, 12)
+    return b
+end
+
+local root = make("Frame", "Root", gui, {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(20, 28, 45),
+    BorderSizePixel = 0
+})
+
+-- MENU
+local menu = make("Frame", "MainMenu", root, {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(20, 28, 45)
+})
+
+label(menu, "Title", "MINI GAME HUB",
+    UDim2.new(0.08, 0, 0.07, 0),
+    UDim2.new(0.84, 0, 0.13, 0),
+    Color3.fromRGB(255, 220, 75), Enum.Font.GothamBlack)
+
+label(menu, "Subtitle", "PILIH GAME FAVORITMU!",
+    UDim2.new(0.1, 0, 0.20, 0),
+    UDim2.new(0.8, 0, 0.06, 0),
+    Color3.fromRGB(210, 220, 240))
+
+local flappyPick = button(menu, "FlappyPick", "🐤  FLAPPY BIRD",
+    UDim2.new(0.12, 0, 0.31, 0),
+    UDim2.new(0.76, 0, 0.15, 0),
+    Color3.fromRGB(40, 150, 220))
+
+local snakePick = button(menu, "SnakePick", "🐍  SNAKE NOKIA",
+    UDim2.new(0.12, 0, 0.49, 0),
+    UDim2.new(0.76, 0, 0.15, 0),
+    Color3.fromRGB(40, 155, 85))
+
+local brickPick = button(menu, "BrickPick", "🧱  BRICK BREAKER",
+    UDim2.new(0.12, 0, 0.67, 0),
+    UDim2.new(0.76, 0, 0.15, 0),
+    Color3.fromRGB(200, 95, 55))
+
+-- Tombol kembali
+local back = button(root, "Back", "‹  MENU",
+    UDim2.new(0, 12, 0, 12),
+    UDim2.fromOffset(105, 42),
+    Color3.fromRGB(45, 55, 75))
+back.Visible = false
+back.ZIndex = 40
+
+-- Tombol buka/tutup draggable di kanan bawah
+local toggle = button(gui, "ToggleGame", "—",
+    UDim2.new(1, -72, 0.68, 0),
+    UDim2.fromOffset(54, 50),
+    Color3.fromRGB(40, 48, 68))
+toggle.AnchorPoint = Vector2.new(0, 0)
+toggle.ZIndex = 100
+toggle.Active = true
+toggle.Selectable = true
+stroke(toggle, Color3.new(1, 1, 1), 2)
+
+local currentGame = "menu"
+local hidden = false
+
+-- =====================================================
+-- FLAPPY BIRD
+-- =====================================================
+
+local flappy = make("Frame", "Flappy", root, {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(105, 200, 245),
+    BorderSizePixel = 0,
+    Visible = false,
+    ClipsDescendants = true
+})
+
+local ground = make("Frame", "Ground", flappy, {
+    Position = UDim2.new(0, 0, 1, -42),
+    Size = UDim2.new(1, 0, 0, 42),
+    BackgroundColor3 = Color3.fromRGB(215, 175, 95),
+    BorderSizePixel = 0,
+    ZIndex = 5
+})
+make("Frame", "Grass", ground, {
+    Size = UDim2.new(1, 0, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(80, 200, 70),
+    BorderSizePixel = 0
+})
+
+local bird = make("Frame", "Bird", flappy, {
+    Position = UDim2.fromScale(0.25, 0.45),
+    Size = UDim2.fromOffset(36, 29),
+    BackgroundColor3 = Color3.fromRGB(255, 215, 35),
+    BorderSizePixel = 0,
+    ZIndex = 8
+})
+round(bird, 15)
+stroke(bird, Color3.fromRGB(200, 140, 20), 2)
+
+local birdEye = make("Frame", "Eye", bird, {
+    Position = UDim2.new(0.67, 0, 0.17, 0),
+    Size = UDim2.fromOffset(8, 8),
+    BackgroundColor3 = Color3.new(1, 1, 1),
+    BorderSizePixel = 0,
+    ZIndex = 9
+})
+round(birdEye, 5)
+
+make("Frame", "Beak", bird, {
+    Position = UDim2.new(0.9, 0, 0.53, 0),
+    Size = UDim2.fromOffset(12, 8),
+    BackgroundColor3 = Color3.fromRGB(255, 120, 20),
+    BorderSizePixel = 0,
+    ZIndex = 9
+})
+
+local fScoreLabel = label(flappy, "Score", "0",
+    UDim2.new(0.4, 0, 0.07, 0),
+    UDim2.new(0.2, 0, 0.09, 0),
+    Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+fScoreLabel.TextStrokeTransparency = 0
+
+local fStageLabel = label(flappy, "Stage", "STAGE 1",
+    UDim2.new(0, 12, 0, 58),
+    UDim2.fromOffset(120, 28),
+    Color3.new(1, 1, 1))
+
+local flapBtn = button(flappy, "Flap", "TAP UNTUK TERBANG",
+    UDim2.new(0.16, 0, 1, -65),
+    UDim2.new(0.68, 0, 0, 52),
+    Color3.fromRGB(255, 185, 45))
+flapBtn.TextColor3 = Color3.fromRGB(50, 40, 25)
+flapBtn.ZIndex = 12
+
+local fOver = make("Frame", "GameOver", flappy, {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.47),
+    Size = UDim2.new(0.8, 0, 0, 160),
+    BackgroundColor3 = Color3.fromRGB(30, 45, 65),
+    Visible = false,
+    ZIndex = 30
+})
+round(fOver, 15)
+label(fOver, "Title", "GAME OVER",
+    UDim2.new(0, 0, 0, 12), UDim2.new(1, 0, 0, 38),
+    Color3.fromRGB(255, 220, 70), Enum.Font.GothamBlack)
+local fFinal = label(fOver, "Final", "Skor: 0",
+    UDim2.new(0, 0, 0, 53), UDim2.new(1, 0, 0, 28))
+local fRestart = button(fOver, "Restart", "MAIN LAGI",
+    UDim2.new(0.15, 0, 0, 98), UDim2.new(0.7, 0, 0, 45),
+    Color3.fromRGB(65, 190, 85))
+fRestart.ZIndex = 31
+
+local fAlive, fStarted = false, false
+local fScore, fStage = 0, 1
+local fY, fVel = 0.45, 0
+local fSpeed, fTimer = 230, 0
+local fPipes = {}
+
+local function clearPipes()
+    for _, p in ipairs(fPipes) do
+        for _, obj in ipairs({p.top, p.bottom, p.cap1, p.cap2}) do
+            if obj and obj.Parent then obj:Destroy() end
+        end
+    end
+    table.clear(fPipes)
+end
+
+local function resetFlappy()
+    clearPipes()
+    fAlive, fStarted = true, false
+    fScore, fStage = 0, 1
+    fY, fVel, fSpeed, fTimer = 0.45, 0, 230, 0
+    bird.Position = UDim2.fromScale(0.25, fY)
+    bird.Rotation = 0
+    fScoreLabel.Text = "0"
+    fStageLabel.Text = "STAGE 1"
+    flappy.BackgroundColor3 = Color3.fromRGB(105, 200, 245)
+    fOver.Visible = false
+end
+
+local function flap()
+    if currentGame ~= "flappy" or hidden or not fAlive then return end
+    fStarted = true
+    fVel = -380
+end
+flapBtn.Activated:Connect(flap)
+
+local function endFlappy()
+    if not fAlive then return end
+    fAlive = false
+    fFinal.Text = "Skor: " .. fScore
+    fOver.Visible = true
+end
+
+local function spawnPipe()
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local v = cam.ViewportSize
+    local groundY = v.Y - 42
+    local gap = math.max(125, 175 - (fStage - 1) * 5)
+    local minY = 100 + gap / 2
+    local maxY = math.max(minY, groundY - 70 - gap / 2)
+    local center = math.random(math.floor(minY), math.floor(maxY))
+    local w = math.clamp(v.X * 0.15, 55, 76)
+    local x = v.X + w
+    local topH = center - gap / 2
+    local botY = center + gap / 2
+
+    local top = make("Frame", "PipeTop", flappy, {
+        Position = UDim2.fromOffset(x, 0),
+        Size = UDim2.fromOffset(w, topH),
+        BackgroundColor3 = Color3.fromRGB(55, 190, 65),
+        BorderSizePixel = 0,
+        ZIndex = 4
+    })
+    local cap1 = make("Frame", "PipeCapTop", flappy, {
+        Position = UDim2.fromOffset(x - 5, topH - 22),
+        Size = UDim2.fromOffset(w + 10, 22),
+        BackgroundColor3 = Color3.fromRGB(65, 210, 70),
+        BorderSizePixel = 0,
+        ZIndex = 5
+    })
+    local bottom = make("Frame", "PipeBottom", flappy, {
+        Position = UDim2.fromOffset(x, botY),
+        Size = UDim2.fromOffset(w, groundY - botY),
+        BackgroundColor3 = Color3.fromRGB(55, 190, 65),
+        BorderSizePixel = 0,
+        ZIndex = 4
+    })
+    local cap2 = make("Frame", "PipeCapBottom", flappy, {
+        Position = UDim2.fromOffset(x - 5, botY),
+        Size = UDim2.fromOffset(w + 10, 22),
+        BackgroundColor3 = Color3.fromRGB(65, 210, 70),
+        BorderSizePixel = 0,
+        ZIndex = 5
+    })
+    for _, obj in ipairs({top, cap1, bottom, cap2}) do
+        stroke(obj, Color3.fromRGB(25, 120, 40), 2)
+    end
+    table.insert(fPipes, {
+        x = x, w = w, gap = gap, center = center,
+        scored = false, top = top, cap1 = cap1,
+        bottom = bottom, cap2 = cap2
+    })
+end
+
+fRestart.Activated:Connect(resetFlappy)
+
+-- =====================================================
+-- SNAKE
+-- =====================================================
+
+local snakeGame = make("Frame", "Snake", root, {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(15, 25, 30),
+    BorderSizePixel = 0,
+    Visible = false
+})
+
+label(snakeGame, "Title", "SNAKE NOKIA",
+    UDim2.new(0.05, 0, 0.07, 0),
+    UDim2.new(0.4, 0, 0.07, 0),
+    Color3.fromRGB(100, 255, 140), Enum.Font.GothamBlack)
+
+local sScoreLabel = label(snakeGame, "Score", "SKOR: 0",
+    UDim2.new(0.05, 0, 0.15, 0),
+    UDim2.new(0.38, 0, 0.05, 0))
+
+local board = make("Frame", "Board", snakeGame, {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.68, 0, 0.5, 0),
+    Size = UDim2.fromOffset(300, 300),
+    BackgroundColor3 = Color3.fromRGB(12, 35, 30),
+    BorderSizePixel = 0,
+    ClipsDescendants = true
+})
+round(board, 8)
+stroke(board, Color3.fromRGB(90, 220, 135), 2)
+
+local GRID = 20
+local cells = {}
+for y = 1, GRID do
+    cells[y] = {}
+    for x = 1, GRID do
+        cells[y][x] = make("Frame", "Cell", board, {
+            Position = UDim2.fromScale((x - 1) / GRID, (y - 1) / GRID),
+            Size = UDim2.fromScale(1 / GRID, 1 / GRID),
+            BackgroundColor3 = Color3.fromRGB(18, 43, 36),
+            BorderSizePixel = 0
+        })
+    end
+end
+
+local controls = make("Frame", "Controls", snakeGame, {
+    Position = UDim2.new(0.03, 0, 0.32, 0),
+    Size = UDim2.new(0.34, 0, 0.46, 0),
+    BackgroundColor3 = Color3.fromRGB(25, 45, 45),
+    BorderSizePixel = 0
+})
+round(controls, 15)
+
+local function dirButton(name, text, x, y)
+    return button(controls, name, text,
+        UDim2.new(x, 0, y, 0),
+        UDim2.new(0.31, 0, 0.29, 0),
+        Color3.fromRGB(40, 145, 105))
+end
+
+local up = dirButton("Up", "▲", 0.345, 0.04)
+local left = dirButton("Left", "◀", 0.04, 0.37)
+local down = dirButton("Down", "▼", 0.345, 0.37)
+local right = dirButton("Right", "▶", 0.65, 0.37)
+
+local sOver = make("Frame", "GameOver", snakeGame, {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.68, 0, 0.5, 0),
+    Size = UDim2.fromOffset(245, 150),
+    BackgroundColor3 = Color3.fromRGB(20, 35, 35),
+    Visible = false,
+    ZIndex = 30
+})
+round(sOver, 15)
+label(sOver, "Title", "GAME OVER",
+    UDim2.new(0, 0, 0, 10), UDim2.new(1, 0, 0, 38),
+    Color3.fromRGB(100, 255, 140), Enum.Font.GothamBlack)
+local sFinal = label(sOver, "Final", "Skor: 0",
+    UDim2.new(0, 0, 0, 50), UDim2.new(1, 0, 0, 28))
+local sRestart = button(sOver, "Restart", "MAIN LAGI",
+    UDim2.new(0.12, 0, 0, 93), UDim2.new(0.76, 0, 0, 43),
+    Color3.fromRGB(50, 180, 100))
+sRestart.ZIndex = 31
+
+local snake = {}
+local food = {x = 15, y = 10}
+local dir = {x = 1, y = 0}
+local nextDir = {x = 1, y = 0}
+local sScore, sAlive, sTimer, sStep = 0, false, 0, 0.15
+
+local function same(a, b)
+    return a.x == b.x and a.y == b.y
+end
+
+local function placeFood()
+    for _ = 1, 500 do
+        local candidate = {x = math.random(1, GRID), y = math.random(1, GRID)}
+        local occupied = false
+        for _, part in ipairs(snake) do
+            if same(part, candidate) then
+                occupied = true
+                break
+            end
+        end
+        if not occupied then
+            food = candidate
+            return
+        end
+    end
+end
+
+local function renderSnake()
+    for y = 1, GRID do
+        for x = 1, GRID do
+            cells[y][x].BackgroundColor3 = Color3.fromRGB(18, 43, 36)
+        end
+    end
+
+    cells[food.y][food.x].BackgroundColor3 = Color3.fromRGB(255, 65, 75)
+
+    for i, p in ipairs(snake) do
+        cells[p.y][p.x].BackgroundColor3 = i == 1
+            and Color3.fromRGB(160, 255, 120)
+            or Color3.fromRGB(65, 210, 105)
+    end
+    sScoreLabel.Text = "SKOR: " .. sScore
+end
+
+local function resetSnake()
+    snake = {{x = 7, y = 10}, {x = 6, y = 10}, {x = 5, y = 10}}
+    dir = {x = 1, y = 0}
+    nextDir = {x = 1, y = 0}
+    sScore, sAlive, sTimer, sStep = 0, true, 0, 0.15
+    sOver.Visible = false
+    placeFood()
+    renderSnake()
+end
+
+local function setDir(x, y)
+    if currentGame ~= "snake" or hidden or not sAlive then return end
+    if x == -dir.x and y == -dir.y then return end
+    nextDir = {x = x, y = y}
+end
+
+up.Activated:Connect(function() setDir(0, -1) end)
+down.Activated:Connect(function() setDir(0, 1) end)
+left.Activated:Connect(function() setDir(-1, 0) end)
+right.Activated:Connect(function() setDir(1, 0) end)
+sRestart.Activated:Connect(resetSnake)
+
+-- =====================================================
+-- BRICK BREAKER
+-- =====================================================
+
+local brickGame = make("Frame", "BrickBreaker", root, {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(18, 25, 48),
+    BorderSizePixel = 0,
+    Visible = false,
+    ClipsDescendants = true
+})
+
+label(brickGame, "Title", "BRICK BREAKER",
+    UDim2.new(0.2, 0, 0.07, 0),
+    UDim2.new(0.6, 0, 0.07, 0),
+    Color3.fromRGB(255, 220, 90), Enum.Font.GothamBlack)
+
+local bScoreLabel = label(brickGame, "Score", "SKOR: 0",
+    UDim2.new(0.03, 0, 0.06, 0),
+    UDim2.new(0.22, 0, 0.05, 0))
+
+local bLivesLabel = label(brickGame, "Lives", "NYAWA: 3",
+    UDim2.new(0.72, 0, 0.06, 0),
+    UDim2.new(0.25, 0, 0.05, 0))
+
+local playArea = make("Frame", "PlayArea", brickGame, {
+    Position = UDim2.new(0.04, 0, 0.16, 0),
+    Size = UDim2.new(0.92, 0, 0.68, 0),
+    BackgroundColor3 = Color3.fromRGB(12, 18, 38),
+    BorderSizePixel = 0,
+    ClipsDescendants = true
+})
+round(playArea, 10)
+stroke(playArea, Color3.fromRGB(80, 120, 200), 2)
+
+local paddle = make("Frame", "Paddle", playArea, {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.91, 0),
+    Size = UDim2.new(0.22, 0, 0, 14),
+    BackgroundColor3 = Color3.fromRGB(70, 210, 255),
+    BorderSizePixel = 0,
+    ZIndex = 5
+})
+round(paddle, 8)
+
+local ball = make("Frame", "Ball", playArea, {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.78),
+    Size = UDim2.fromOffset(14, 14),
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+    BorderSizePixel = 0,
+    ZIndex = 6
+})
+round(ball, 10)
+
+local bOver = make("Frame", "GameOver", brickGame, {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.new(0.78, 0, 0, 170),
+    BackgroundColor3 = Color3.fromRGB(25, 35, 60),
+    Visible = false,
+    ZIndex = 30
+})
+round(bOver, 15)
+label(bOver, "Title", "GAME OVER",
+    UDim2.new(0, 0, 0, 12), UDim2.new(1, 0, 0, 40),
+    Color3.fromRGB(255, 220, 90), Enum.Font.GothamBlack)
+local bFinal = label(bOver, "Final", "Skor: 0",
+    UDim2.new(0, 0, 0, 55), UDim2.new(1, 0, 0, 28))
+local bRestart = button(bOver, "Restart", "MAIN LAGI",
+    UDim2.new(0.15, 0, 0, 105), UDim2.new(0.7, 0, 0, 45),
+    Color3.fromRGB(65, 150, 230))
+bRestart.ZIndex = 31
+
+local bricks = {}
+local bScore, bLives, bAlive = 0, 3, false
+local ballX, ballY = 0.5, 0.78
+local ballVX, ballVY = 0.34, -0.48
+local paddleX = 0.5
+local paddleDir = 0
+local ballStarted = false
+local brickRows, brickCols = 5, 8
+
+local brickColors = {
+    Color3.fromRGB(255, 80, 90),
+    Color3.fromRGB(255, 160, 65),
+    Color3.fromRGB(255, 220, 70),
+    Color3.fromRGB(70, 210, 120),
+    Color3.fromRGB(75, 160, 255)
+}
+
+local function clearBricks()
+    for _, brick in ipairs(bricks) do
+        if brick.frame and brick.frame.Parent then brick.frame:Destroy() end
+    end
+    table.clear(bricks)
+end
+
+local function makeBricks()
+    clearBricks()
+
+    local gap = 4
+    local areaWidth = playArea.AbsoluteSize.X
+    local brickWidth = math.max(20, (areaWidth - gap * (brickCols + 1)) / brickCols)
+    local brickHeight = math.max(12, math.min(20, playArea.AbsoluteSize.Y * 0.035))
+
+    for row = 1, brickRows do
+        for col = 1, brickCols do
+            local brick = make("Frame", "Brick", playArea, {
+                Position = UDim2.fromOffset(
+                    gap + (col - 1) * (brickWidth + gap),
+                    18 + (row - 1) * (brickHeight + gap)
+                ),
+                Size = UDim2.fromOffset(brickWidth, brickHeight),
+                BackgroundColor3 = brickColors[row],
+                BorderSizePixel = 0,
+                ZIndex = 3
+            })
+            round(brick, 4)
+            table.insert(bricks, {frame = brick, alive = true})
+        end
+    end
+end
+
+local function resetBrick()
+    bScore, bLives, bAlive = 0, 3, true
+    ballX, ballY = 0.5, 0.78
+    ballVX, ballVY = 0.34, -0.48
+    paddleX = 0.5
+    paddleDir = 0
+    ballStarted = false
+    bOver.Visible = false
+    bScoreLabel.Text = "SKOR: 0"
+    bLivesLabel.Text = "NYAWA: 3"
+    paddle.Position = UDim2.new(0.5, 0, 0.91, 0)
+    ball.Position = UDim2.fromScale(ballX, ballY)
+    makeBricks()
+end
+
+local function finishBrick()
+    bAlive = false
+    bFinal.Text = "Skor: " .. bScore
+    bOver.Visible = true
+end
+
+bRestart.Activated:Connect(resetBrick)
+
+-- Move paddle with touch/mouse. Tap area to launch ball.
+local function movePaddleFromScreenX(screenX)
+    local areaPos = playArea.AbsolutePosition
+    local areaSize = playArea.AbsoluteSize
+    if areaSize.X <= 0 then return end
+    paddleX = math.clamp((screenX - areaPos.X) / areaSize.X, 0.12, 0.88)
+    paddle.Position = UDim2.new(paddleX, 0, 0.91, 0)
+end
+
+playArea.InputBegan:Connect(function(input)
+    if currentGame ~= "brick" or hidden or not bAlive then return end
+
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        movePaddleFromScreenX(input.Position.X)
+        ballStarted = true
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if currentGame ~= "brick" or hidden then return end
+
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseMovement then
+        if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            or input.UserInputType == Enum.UserInputType.Touch then
+            movePaddleFromScreenX(input.Position.X)
+        end
+    end
+end)
+
+-- Keyboard paddle control for computer
+UIS.InputBegan:Connect(function(input, processed)
+    if processed or hidden then return end
+    if currentGame == "brick" then
+        if input.KeyCode == Enum.KeyCode.Left then paddleDir = -1 end
+        if input.KeyCode == Enum.KeyCode.Right then paddleDir = 1 end
+        if input.KeyCode == Enum.KeyCode.Space then ballStarted = true end
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Left and paddleDir == -1 then paddleDir = 0 end
+    if input.KeyCode == Enum.KeyCode.Right and paddleDir == 1 then paddleDir = 0 end
+end)
+
+-- =====================================================
+-- NAVIGATION
+-- =====================================================
+
+local function showMenu()
+    currentGame = "menu"
+    menu.Visible = true
+    flappy.Visible = false
+    snakeGame.Visible = false
+    brickGame.Visible = false
+    back.Visible = false
+end
+
+local function startFlappy()
+    currentGame = "flappy"
+    menu.Visible = false
+    flappy.Visible = true
+    snakeGame.Visible = false
+    brickGame.Visible = false
+    back.Visible = true
+    resetFlappy()
+end
+
+local function startSnake()
+    currentGame = "snake"
+    menu.Visible = false
+    flappy.Visible = false
+    snakeGame.Visible = true
+    brickGame.Visible = false
+    back.Visible = true
+    resetSnake()
+end
+
+local function startBrick()
+    currentGame = "brick"
+    menu.Visible = false
+    flappy.Visible = false
+    snakeGame.Visible = false
+    brickGame.Visible = true
+    back.Visible = true
+    resetBrick()
+end
+
+flappyPick.Activated:Connect(startFlappy)
+snakePick.Activated:Connect(startSnake)
+brickPick.Activated:Connect(startBrick)
+back.Activated:Connect(showMenu)
+
+-- =====================================================
+-- DRAGGABLE OPEN/CLOSE BUTTON
+-- =====================================================
+
+local dragging = false
+local moved = false
+local dragStart
+local startPos
+
+toggle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        moved = false
+        dragStart = input.Position
+        startPos = toggle.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not dragging then return end
+
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+
+        if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then
+            moved = true
+        end
+
+        if moved then
+            local cam = workspace.CurrentCamera
+            if cam then
+                local view = cam.ViewportSize
+                local x = math.clamp(
+                    startPos.X.Offset + delta.X,
+                    0,
+                    view.X - toggle.AbsoluteSize.X
+                )
+                local y = math.clamp(
+                    startPos.Y.Offset + delta.Y,
+                    0,
+                    view.Y - toggle.AbsoluteSize.Y
+                )
+                toggle.Position = UDim2.fromOffset(x, y)
+            end
+        end
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if not dragging then return end
+
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+
+        if not moved then
+            hidden = not hidden
+            root.Visible = not hidden
+            toggle.Text = hidden and "▶" or "—"
+        end
+
+        dragStart = nil
+        startPos = nil
+    end
+end)
+
+-- =====================================================
+-- MAIN UPDATE LOOP
+-- =====================================================
+
+RunService.RenderStepped:Connect(function(dt)
+    if hidden or not root.Visible then return end
+
+    -- FLAPPY UPDATE
+    if currentGame == "flappy" and fAlive and fStarted then
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local v = cam.ViewportSize
+        local groundY = v.Y - 42
+
+        fVel += 1250 * dt
+        fY += fVel * dt / v.Y
+        bird.Position = UDim2.fromScale(0.25, fY)
+        bird.Rotation = math.clamp(fVel / 15, -25, 80)
+
+        local bx, by = v.X * 0.25, fY * v.Y
+        local bw, bh = bird.AbsoluteSize.X, bird.AbsoluteSize.Y
+
+        if by <= 0 or by + bh >= groundY then
+            endFlappy()
+        end
+
+        fTimer += dt
+        if fTimer >= math.max(0.75, 0.95 * v.X / fSpeed) then
+            fTimer = 0
+            spawnPipe()
+        end
+
+        for i = #fPipes, 1, -1 do
+            local p = fPipes[i]
+            p.x -= fSpeed * dt
+            p.top.Position = UDim2.fromOffset(p.x, 0)
+            p.cap1.Position = UDim2.fromOffset(p.x - 5, p.top.AbsoluteSize.Y - 22)
+            p.bottom.Position = UDim2.fromOffset(p.x, p.center + p.gap / 2)
+            p.cap2.Position = UDim2.fromOffset(p.x - 5, p.center + p.gap / 2)
+
+            if bx + bw > p.x and bx < p.x + p.w then
+                if by < p.center - p.gap / 2
+                    or by + bh > p.center + p.gap / 2 then
+                    endFlappy()
+                end
+            end
+
+            if not p.scored and p.x + p.w < bx then
+                p.scored = true
+                fScore += 1
+                fScoreLabel.Text = tostring(fScore)
+
+                local stage = math.floor(fScore / 5) + 1
+                if stage ~= fStage then
+                    fStage = stage
+                    fSpeed = 230 + (fStage - 1) * 25
+                    fStageLabel.Text = "STAGE " .. fStage
+                end
+            end
+
+            if p.x + p.w < -20 then
+                p.top:Destroy()
+                p.bottom:Destroy()
+                p.cap1:Destroy()
+                p.cap2:Destroy()
+                table.remove(fPipes, i)
+            end
+        end
+
+    elseif currentGame == "flappy" and fAlive and not fStarted then
+        bird.Position = UDim2.fromScale(
+            0.25, 0.45 + math.sin(os.clock() * 3) * 0.012
+        )
+
+    -- SNAKE UPDATE
+    elseif currentGame == "snake" and sAlive then
+        local cam = workspace.CurrentCamera
+        if cam then
+            local v = cam.ViewportSize
+            local size = math.max(180, math.floor(math.min(v.X * 0.53, v.Y * 0.62)))
+            board.Size = UDim2.fromOffset(size, size)
+            sOver.Position = board.Position
+        end
+
+        sTimer += dt
+        if sTimer >= sStep then
+            sTimer -= sStep
+            dir = {x = nextDir.x, y = nextDir.y}
+
+            local head = snake[1]
+            local newHead = {x = head.x + dir.x, y = head.y + dir.y}
+
+            if newHead.x < 1 or newHead.x > GRID
+                or newHead.y < 1 or newHead.y > GRID then
+                sAlive = false
+            else
+                local eating = same(newHead, food)
+                local limit = eating and #snake or (#snake - 1)
+
+                for i = 1, limit do
+                    if same(snake[i], newHead) then
+                        sAlive = false
+                        break
+                    end
+                end
+
+                if sAlive then
+                    table.insert(snake, 1, newHead)
+                    if eating then
+                        sScore += 1
+                        sStep = math.max(0.075, 0.15 - sScore * 0.002)
+                        placeFood()
+                    else
+                        table.remove(snake)
+                    end
+                end
+            end
+
+            if not sAlive then
+                sFinal.Text = "Skor: " .. sScore
+                sOver.Visible = true
+            end
+
+            renderSnake()
+        end
+
+    -- BRICK BREAKER UPDATE
+    elseif currentGame == "brick" and bAlive then
+        local size = playArea.AbsoluteSize
+        if size.X <= 0 or size.Y <= 0 then return end
+
+        paddleX = math.clamp(paddleX + paddleDir * dt * 0.8, 0.12, 0.88)
+        paddle.Position = UDim2.new(paddleX, 0, 0.91, 0)
+
+        if not ballStarted then
+            ballX = paddleX
+            ballY = 0.78
+            ball.Position = UDim2.fromScale(ballX, ballY)
+            return
+        end
+
+        local oldX, oldY = ballX, ballY
+        ballX += ballVX * dt
+        ballY += ballVY * dt
+
+        local radiusX = 7 / size.X
+        local radiusY = 7 / size.Y
+
+        if ballX <= radiusX then
+            ballX = radiusX
+            ballVX = math.abs(ballVX)
+        elseif ballX >= 1 - radiusX then
+            ballX = 1 - radiusX
+            ballVX = -math.abs(ballVX)
+        end
+
+        if ballY <= radiusY then
+            ballY = radiusY
+            ballVY = math.abs(ballVY)
+        end
+
+        -- Paddle collision
+        local paddleY = 0.91
+        if ballVY > 0
+            and oldY + radiusY <= paddleY
+            and ballY + radiusY >= paddleY - 0.025
+            and math.abs(ballX - paddleX) < 0.14 then
+            ballY = paddleY - 0.025
+            ballVY = -math.abs(ballVY)
+            ballVX = math.clamp((ballX - paddleX) * 2.5, -0.65, 0.65)
+        end
+
+        -- Brick collision
+        for _, brick in ipairs(bricks) do
+            if brick.alive and brick.frame.Parent then
+                local bx = brick.frame.Position.X.Offset
+                local by = brick.frame.Position.Y.Offset
+                local bw = brick.frame.AbsoluteSize.X
+                local bh = brick.frame.AbsoluteSize.Y
+
+                local px = ballX * size.X
+                local py = ballY * size.Y
+
+                if px + 7 >= bx and px - 7 <= bx + bw
+                    and py + 7 >= by and py - 7 <= by + bh then
+                    brick.alive = false
+                    brick.frame:Destroy()
+                    bScore += 10
+                    bScoreLabel.Text = "SKOR: " .. bScore
+                    ballVY = -ballVY
+                    break
+                end
+            end
+        end
+
+        if ballY > 1 then
+            bLives -= 1
+            bLivesLabel.Text = "NYAWA: " .. bLives
+
+            if bLives <= 0 then
+                finishBrick()
+            else
+                ballX, ballY = paddleX, 0.78
+                ballVX, ballVY = 0.34, -0.48
+                ballStarted = false
+            end
+        end
+
+        ball.Position = UDim2.fromScale(ballX, ballY)
+
+        local remaining = 0
+        for _, brick in ipairs(bricks) do
+            if brick.alive then remaining += 1 end
+        end
+
+        if remaining == 0 then
+            finishBrick()
+        end
+    end
+end)
+
+-- Start in menu
+showMenu()
+resetFlappy()
+resetSnake()
+resetBrick()

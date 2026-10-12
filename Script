@@ -1,1003 +1,2497 @@
+-- PIXEL ARCADE HUB V5
+-- 11 GAMES | MOBILE FRIENDLY | SOUND EFFECT
+-- LocalScript: StarterPlayer > StarterPlayerScripts
 
--- MINI GAME HUB 3-IN-1
--- Flappy Bird + Snake + Brick Breaker
--- Satu LocalScript di StarterPlayer > StarterPlayerScripts
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local UIS=game:GetService("UserInputService")
+local GuiService=game:GetService("GuiService")
+local TweenService=game:GetService("TweenService")
+local Debris=game:GetService("Debris")
+local CAS=game:GetService("ContextActionService")
+local player=Players.LocalPlayer
+local pg=player:WaitForChild("PlayerGui")
 
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-local old = playerGui:FindFirstChild("MiniGameHub")
+local old=pg:FindFirstChild("MiniGameHub")
 if old then old:Destroy() end
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "MiniGameHub"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.DisplayOrder = 50
-gui.Parent = playerGui
+local gui=Instance.new("ScreenGui")
+gui.Name="MiniGameHub"
+gui.IgnoreGuiInset=true
+gui.ResetOnSpawn=false
+gui.DisplayOrder=999
+gui.Parent=pg
 
-local function make(class, name, parent, props)
-    local obj = Instance.new(class)
-    obj.Name = name
-    for k, v in pairs(props or {}) do
-        obj[k] = v
-    end
-    obj.Parent = parent
-    return obj
-end
-
-local function round(obj, radius)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, radius)
-    c.Parent = obj
-end
-
-local function stroke(obj, color, thickness)
-    local s = Instance.new("UIStroke")
-    s.Color = color or Color3.new(1, 1, 1)
-    s.Thickness = thickness or 2
-    s.Parent = obj
-end
-
-local function label(parent, name, text, pos, size, color, font)
-    return make("TextLabel", name, parent, {
-        Position = pos,
-        Size = size,
-        BackgroundTransparency = 1,
-        Text = text,
-        TextColor3 = color or Color3.new(1, 1, 1),
-        Font = font or Enum.Font.GothamBold,
-        TextScaled = true
-    })
-end
-
-local function button(parent, name, text, pos, size, color)
-    local b = make("TextButton", name, parent, {
-        Position = pos,
-        Size = size,
-        BackgroundColor3 = color,
-        Text = text,
-        TextColor3 = Color3.new(1, 1, 1),
-        Font = Enum.Font.GothamBlack,
-        TextScaled = true,
-        BorderSizePixel = 0,
-        AutoButtonColor = true
-    })
-    round(b, 12)
-    return b
-end
-
-local root = make("Frame", "Root", gui, {
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(20, 28, 45),
-    BorderSizePixel = 0
-})
-
--- MENU
-local menu = make("Frame", "MainMenu", root, {
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(20, 28, 45)
-})
-
-label(menu, "Title", "MINI GAME HUB",
-    UDim2.new(0.08, 0, 0.07, 0),
-    UDim2.new(0.84, 0, 0.13, 0),
-    Color3.fromRGB(255, 220, 75), Enum.Font.GothamBlack)
-
-label(menu, "Subtitle", "PILIH GAME FAVORITMU!",
-    UDim2.new(0.1, 0, 0.20, 0),
-    UDim2.new(0.8, 0, 0.06, 0),
-    Color3.fromRGB(210, 220, 240))
-
-local flappyPick = button(menu, "FlappyPick", "🐤  FLAPPY BIRD",
-    UDim2.new(0.12, 0, 0.31, 0),
-    UDim2.new(0.76, 0, 0.15, 0),
-    Color3.fromRGB(40, 150, 220))
-
-local snakePick = button(menu, "SnakePick", "🐍  SNAKE NOKIA",
-    UDim2.new(0.12, 0, 0.49, 0),
-    UDim2.new(0.76, 0, 0.15, 0),
-    Color3.fromRGB(40, 155, 85))
-
-local brickPick = button(menu, "BrickPick", "🧱  BRICK BREAKER",
-    UDim2.new(0.12, 0, 0.67, 0),
-    UDim2.new(0.76, 0, 0.15, 0),
-    Color3.fromRGB(200, 95, 55))
-
--- Tombol kembali
-local back = button(root, "Back", "‹  MENU",
-    UDim2.new(0, 12, 0, 12),
-    UDim2.fromOffset(105, 42),
-    Color3.fromRGB(45, 55, 75))
-back.Visible = false
-back.ZIndex = 40
-
--- Tombol buka/tutup draggable di kanan bawah
-local toggle = button(gui, "ToggleGame", "—",
-    UDim2.new(1, -72, 0.68, 0),
-    UDim2.fromOffset(54, 50),
-    Color3.fromRGB(40, 48, 68))
-toggle.AnchorPoint = Vector2.new(0, 0)
-toggle.ZIndex = 100
-toggle.Active = true
-toggle.Selectable = true
-stroke(toggle, Color3.new(1, 1, 1), 2)
-
-local currentGame = "menu"
-local hidden = false
-
--- =====================================================
--- FLAPPY BIRD
--- =====================================================
-
-local flappy = make("Frame", "Flappy", root, {
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(105, 200, 245),
-    BorderSizePixel = 0,
-    Visible = false,
-    ClipsDescendants = true
-})
-
-local ground = make("Frame", "Ground", flappy, {
-    Position = UDim2.new(0, 0, 1, -42),
-    Size = UDim2.new(1, 0, 0, 42),
-    BackgroundColor3 = Color3.fromRGB(215, 175, 95),
-    BorderSizePixel = 0,
-    ZIndex = 5
-})
-make("Frame", "Grass", ground, {
-    Size = UDim2.new(1, 0, 0, 8),
-    BackgroundColor3 = Color3.fromRGB(80, 200, 70),
-    BorderSizePixel = 0
-})
-
-local bird = make("Frame", "Bird", flappy, {
-    Position = UDim2.fromScale(0.25, 0.45),
-    Size = UDim2.fromOffset(36, 29),
-    BackgroundColor3 = Color3.fromRGB(255, 215, 35),
-    BorderSizePixel = 0,
-    ZIndex = 8
-})
-round(bird, 15)
-stroke(bird, Color3.fromRGB(200, 140, 20), 2)
-
-local birdEye = make("Frame", "Eye", bird, {
-    Position = UDim2.new(0.67, 0, 0.17, 0),
-    Size = UDim2.fromOffset(8, 8),
-    BackgroundColor3 = Color3.new(1, 1, 1),
-    BorderSizePixel = 0,
-    ZIndex = 9
-})
-round(birdEye, 5)
-
-make("Frame", "Beak", bird, {
-    Position = UDim2.new(0.9, 0, 0.53, 0),
-    Size = UDim2.fromOffset(12, 8),
-    BackgroundColor3 = Color3.fromRGB(255, 120, 20),
-    BorderSizePixel = 0,
-    ZIndex = 9
-})
-
-local fScoreLabel = label(flappy, "Score", "0",
-    UDim2.new(0.4, 0, 0.07, 0),
-    UDim2.new(0.2, 0, 0.09, 0),
-    Color3.new(1, 1, 1), Enum.Font.GothamBlack)
-fScoreLabel.TextStrokeTransparency = 0
-
-local fStageLabel = label(flappy, "Stage", "STAGE 1",
-    UDim2.new(0, 12, 0, 58),
-    UDim2.fromOffset(120, 28),
-    Color3.new(1, 1, 1))
-
-local flapBtn = button(flappy, "Flap", "TAP UNTUK TERBANG",
-    UDim2.new(0.16, 0, 1, -65),
-    UDim2.new(0.68, 0, 0, 52),
-    Color3.fromRGB(255, 185, 45))
-flapBtn.TextColor3 = Color3.fromRGB(50, 40, 25)
-flapBtn.ZIndex = 12
-
-local fOver = make("Frame", "GameOver", flappy, {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.47),
-    Size = UDim2.new(0.8, 0, 0, 160),
-    BackgroundColor3 = Color3.fromRGB(30, 45, 65),
-    Visible = false,
-    ZIndex = 30
-})
-round(fOver, 15)
-label(fOver, "Title", "GAME OVER",
-    UDim2.new(0, 0, 0, 12), UDim2.new(1, 0, 0, 38),
-    Color3.fromRGB(255, 220, 70), Enum.Font.GothamBlack)
-local fFinal = label(fOver, "Final", "Skor: 0",
-    UDim2.new(0, 0, 0, 53), UDim2.new(1, 0, 0, 28))
-local fRestart = button(fOver, "Restart", "MAIN LAGI",
-    UDim2.new(0.15, 0, 0, 98), UDim2.new(0.7, 0, 0, 45),
-    Color3.fromRGB(65, 190, 85))
-fRestart.ZIndex = 31
-
-local fAlive, fStarted = false, false
-local fScore, fStage = 0, 1
-local fY, fVel = 0.45, 0
-local fSpeed, fTimer = 230, 0
-local fPipes = {}
-
-local function clearPipes()
-    for _, p in ipairs(fPipes) do
-        for _, obj in ipairs({p.top, p.bottom, p.cap1, p.cap2}) do
-            if obj and obj.Parent then obj:Destroy() end
-        end
-    end
-    table.clear(fPipes)
-end
-
-local function resetFlappy()
-    clearPipes()
-    fAlive, fStarted = true, false
-    fScore, fStage = 0, 1
-    fY, fVel, fSpeed, fTimer = 0.45, 0, 230, 0
-    bird.Position = UDim2.fromScale(0.25, fY)
-    bird.Rotation = 0
-    fScoreLabel.Text = "0"
-    fStageLabel.Text = "STAGE 1"
-    flappy.BackgroundColor3 = Color3.fromRGB(105, 200, 245)
-    fOver.Visible = false
-end
-
-local function flap()
-    if currentGame ~= "flappy" or hidden or not fAlive then return end
-    fStarted = true
-    fVel = -380
-end
-flapBtn.Activated:Connect(flap)
-
-local function endFlappy()
-    if not fAlive then return end
-    fAlive = false
-    fFinal.Text = "Skor: " .. fScore
-    fOver.Visible = true
-end
-
-local function spawnPipe()
-    local cam = workspace.CurrentCamera
-    if not cam then return end
-    local v = cam.ViewportSize
-    local groundY = v.Y - 42
-    local gap = math.max(125, 175 - (fStage - 1) * 5)
-    local minY = 100 + gap / 2
-    local maxY = math.max(minY, groundY - 70 - gap / 2)
-    local center = math.random(math.floor(minY), math.floor(maxY))
-    local w = math.clamp(v.X * 0.15, 55, 76)
-    local x = v.X + w
-    local topH = center - gap / 2
-    local botY = center + gap / 2
-
-    local top = make("Frame", "PipeTop", flappy, {
-        Position = UDim2.fromOffset(x, 0),
-        Size = UDim2.fromOffset(w, topH),
-        BackgroundColor3 = Color3.fromRGB(55, 190, 65),
-        BorderSizePixel = 0,
-        ZIndex = 4
-    })
-    local cap1 = make("Frame", "PipeCapTop", flappy, {
-        Position = UDim2.fromOffset(x - 5, topH - 22),
-        Size = UDim2.fromOffset(w + 10, 22),
-        BackgroundColor3 = Color3.fromRGB(65, 210, 70),
-        BorderSizePixel = 0,
-        ZIndex = 5
-    })
-    local bottom = make("Frame", "PipeBottom", flappy, {
-        Position = UDim2.fromOffset(x, botY),
-        Size = UDim2.fromOffset(w, groundY - botY),
-        BackgroundColor3 = Color3.fromRGB(55, 190, 65),
-        BorderSizePixel = 0,
-        ZIndex = 4
-    })
-    local cap2 = make("Frame", "PipeCapBottom", flappy, {
-        Position = UDim2.fromOffset(x - 5, botY),
-        Size = UDim2.fromOffset(w + 10, 22),
-        BackgroundColor3 = Color3.fromRGB(65, 210, 70),
-        BorderSizePixel = 0,
-        ZIndex = 5
-    })
-    for _, obj in ipairs({top, cap1, bottom, cap2}) do
-        stroke(obj, Color3.fromRGB(25, 120, 40), 2)
-    end
-    table.insert(fPipes, {
-        x = x, w = w, gap = gap, center = center,
-        scored = false, top = top, cap1 = cap1,
-        bottom = bottom, cap2 = cap2
-    })
-end
-
-fRestart.Activated:Connect(resetFlappy)
-
--- =====================================================
--- SNAKE
--- =====================================================
-
-local snakeGame = make("Frame", "Snake", root, {
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(15, 25, 30),
-    BorderSizePixel = 0,
-    Visible = false
-})
-
-label(snakeGame, "Title", "SNAKE NOKIA",
-    UDim2.new(0.05, 0, 0.07, 0),
-    UDim2.new(0.4, 0, 0.07, 0),
-    Color3.fromRGB(100, 255, 140), Enum.Font.GothamBlack)
-
-local sScoreLabel = label(snakeGame, "Score", "SKOR: 0",
-    UDim2.new(0.05, 0, 0.15, 0),
-    UDim2.new(0.38, 0, 0.05, 0))
-
-local board = make("Frame", "Board", snakeGame, {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.68, 0, 0.5, 0),
-    Size = UDim2.fromOffset(300, 300),
-    BackgroundColor3 = Color3.fromRGB(12, 35, 30),
-    BorderSizePixel = 0,
-    ClipsDescendants = true
-})
-round(board, 8)
-stroke(board, Color3.fromRGB(90, 220, 135), 2)
-
-local GRID = 20
-local cells = {}
-for y = 1, GRID do
-    cells[y] = {}
-    for x = 1, GRID do
-        cells[y][x] = make("Frame", "Cell", board, {
-            Position = UDim2.fromScale((x - 1) / GRID, (y - 1) / GRID),
-            Size = UDim2.fromScale(1 / GRID, 1 / GRID),
-            BackgroundColor3 = Color3.fromRGB(18, 43, 36),
-            BorderSizePixel = 0
-        })
-    end
-end
-
-local controls = make("Frame", "Controls", snakeGame, {
-    Position = UDim2.new(0.03, 0, 0.32, 0),
-    Size = UDim2.new(0.34, 0, 0.46, 0),
-    BackgroundColor3 = Color3.fromRGB(25, 45, 45),
-    BorderSizePixel = 0
-})
-round(controls, 15)
-
-local function dirButton(name, text, x, y)
-    return button(controls, name, text,
-        UDim2.new(x, 0, y, 0),
-        UDim2.new(0.31, 0, 0.29, 0),
-        Color3.fromRGB(40, 145, 105))
-end
-
-local up = dirButton("Up", "▲", 0.345, 0.04)
-local left = dirButton("Left", "◀", 0.04, 0.37)
-local down = dirButton("Down", "▼", 0.345, 0.37)
-local right = dirButton("Right", "▶", 0.65, 0.37)
-
-local sOver = make("Frame", "GameOver", snakeGame, {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.68, 0, 0.5, 0),
-    Size = UDim2.fromOffset(245, 150),
-    BackgroundColor3 = Color3.fromRGB(20, 35, 35),
-    Visible = false,
-    ZIndex = 30
-})
-round(sOver, 15)
-label(sOver, "Title", "GAME OVER",
-    UDim2.new(0, 0, 0, 10), UDim2.new(1, 0, 0, 38),
-    Color3.fromRGB(100, 255, 140), Enum.Font.GothamBlack)
-local sFinal = label(sOver, "Final", "Skor: 0",
-    UDim2.new(0, 0, 0, 50), UDim2.new(1, 0, 0, 28))
-local sRestart = button(sOver, "Restart", "MAIN LAGI",
-    UDim2.new(0.12, 0, 0, 93), UDim2.new(0.76, 0, 0, 43),
-    Color3.fromRGB(50, 180, 100))
-sRestart.ZIndex = 31
-
-local snake = {}
-local food = {x = 15, y = 10}
-local dir = {x = 1, y = 0}
-local nextDir = {x = 1, y = 0}
-local sScore, sAlive, sTimer, sStep = 0, false, 0, 0.15
-
-local function same(a, b)
-    return a.x == b.x and a.y == b.y
-end
-
-local function placeFood()
-    for _ = 1, 500 do
-        local candidate = {x = math.random(1, GRID), y = math.random(1, GRID)}
-        local occupied = false
-        for _, part in ipairs(snake) do
-            if same(part, candidate) then
-                occupied = true
-                break
-            end
-        end
-        if not occupied then
-            food = candidate
-            return
-        end
-    end
-end
-
-local function renderSnake()
-    for y = 1, GRID do
-        for x = 1, GRID do
-            cells[y][x].BackgroundColor3 = Color3.fromRGB(18, 43, 36)
-        end
-    end
-
-    cells[food.y][food.x].BackgroundColor3 = Color3.fromRGB(255, 65, 75)
-
-    for i, p in ipairs(snake) do
-        cells[p.y][p.x].BackgroundColor3 = i == 1
-            and Color3.fromRGB(160, 255, 120)
-            or Color3.fromRGB(65, 210, 105)
-    end
-    sScoreLabel.Text = "SKOR: " .. sScore
-end
-
-local function resetSnake()
-    snake = {{x = 7, y = 10}, {x = 6, y = 10}, {x = 5, y = 10}}
-    dir = {x = 1, y = 0}
-    nextDir = {x = 1, y = 0}
-    sScore, sAlive, sTimer, sStep = 0, true, 0, 0.15
-    sOver.Visible = false
-    placeFood()
-    renderSnake()
-end
-
-local function setDir(x, y)
-    if currentGame ~= "snake" or hidden or not sAlive then return end
-    if x == -dir.x and y == -dir.y then return end
-    nextDir = {x = x, y = y}
-end
-
-up.Activated:Connect(function() setDir(0, -1) end)
-down.Activated:Connect(function() setDir(0, 1) end)
-left.Activated:Connect(function() setDir(-1, 0) end)
-right.Activated:Connect(function() setDir(1, 0) end)
-sRestart.Activated:Connect(resetSnake)
-
--- =====================================================
--- BRICK BREAKER
--- =====================================================
-
-local brickGame = make("Frame", "BrickBreaker", root, {
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(18, 25, 48),
-    BorderSizePixel = 0,
-    Visible = false,
-    ClipsDescendants = true
-})
-
-label(brickGame, "Title", "BRICK BREAKER",
-    UDim2.new(0.2, 0, 0.07, 0),
-    UDim2.new(0.6, 0, 0.07, 0),
-    Color3.fromRGB(255, 220, 90), Enum.Font.GothamBlack)
-
-local bScoreLabel = label(brickGame, "Score", "SKOR: 0",
-    UDim2.new(0.03, 0, 0.06, 0),
-    UDim2.new(0.22, 0, 0.05, 0))
-
-local bLivesLabel = label(brickGame, "Lives", "NYAWA: 3",
-    UDim2.new(0.72, 0, 0.06, 0),
-    UDim2.new(0.25, 0, 0.05, 0))
-
-local playArea = make("Frame", "PlayArea", brickGame, {
-    Position = UDim2.new(0.04, 0, 0.16, 0),
-    Size = UDim2.new(0.92, 0, 0.68, 0),
-    BackgroundColor3 = Color3.fromRGB(12, 18, 38),
-    BorderSizePixel = 0,
-    ClipsDescendants = true
-})
-round(playArea, 10)
-stroke(playArea, Color3.fromRGB(80, 120, 200), 2)
-
-local paddle = make("Frame", "Paddle", playArea, {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.5, 0, 0.91, 0),
-    Size = UDim2.new(0.22, 0, 0, 14),
-    BackgroundColor3 = Color3.fromRGB(70, 210, 255),
-    BorderSizePixel = 0,
-    ZIndex = 5
-})
-round(paddle, 8)
-
-local ball = make("Frame", "Ball", playArea, {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.78),
-    Size = UDim2.fromOffset(14, 14),
-    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-    BorderSizePixel = 0,
-    ZIndex = 6
-})
-round(ball, 10)
-
-local bOver = make("Frame", "GameOver", brickGame, {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.new(0.78, 0, 0, 170),
-    BackgroundColor3 = Color3.fromRGB(25, 35, 60),
-    Visible = false,
-    ZIndex = 30
-})
-round(bOver, 15)
-label(bOver, "Title", "GAME OVER",
-    UDim2.new(0, 0, 0, 12), UDim2.new(1, 0, 0, 40),
-    Color3.fromRGB(255, 220, 90), Enum.Font.GothamBlack)
-local bFinal = label(bOver, "Final", "Skor: 0",
-    UDim2.new(0, 0, 0, 55), UDim2.new(1, 0, 0, 28))
-local bRestart = button(bOver, "Restart", "MAIN LAGI",
-    UDim2.new(0.15, 0, 0, 105), UDim2.new(0.7, 0, 0, 45),
-    Color3.fromRGB(65, 150, 230))
-bRestart.ZIndex = 31
-
-local bricks = {}
-local bScore, bLives, bAlive = 0, 3, false
-local ballX, ballY = 0.5, 0.78
-local ballVX, ballVY = 0.34, -0.48
-local paddleX = 0.5
-local paddleDir = 0
-local ballStarted = false
-local brickRows, brickCols = 5, 8
-
-local brickColors = {
-    Color3.fromRGB(255, 80, 90),
-    Color3.fromRGB(255, 160, 65),
-    Color3.fromRGB(255, 220, 70),
-    Color3.fromRGB(70, 210, 120),
-    Color3.fromRGB(75, 160, 255)
+---------------------------------------------------------------------
+-- TEMA
+---------------------------------------------------------------------
+local C={
+ bg=Color3.fromRGB(15,19,34),
+ panel=Color3.fromRGB(27,34,58),
+ card=Color3.fromRGB(38,48,80),
+ field=Color3.fromRGB(12,17,30),
+ line=Color3.fromRGB(70,86,130),
+ white=Color3.fromRGB(245,246,250),
+ dim=Color3.fromRGB(150,162,192),
+ dark=Color3.fromRGB(14,18,32),
+ yellow=Color3.fromRGB(255,206,70),
+ green=Color3.fromRGB(70,214,120),
+ red=Color3.fromRGB(240,80,90),
+ blue=Color3.fromRGB(60,140,255),
+ purple=Color3.fromRGB(165,100,235),
+ orange=Color3.fromRGB(255,150,60),
+ cyan=Color3.fromRGB(70,220,230),
+ pink=Color3.fromRGB(240,110,170),
+ skin=Color3.fromRGB(255,190,125),
 }
 
-local function clearBricks()
-    for _, brick in ipairs(bricks) do
-        if brick.frame and brick.frame.Parent then brick.frame:Destroy() end
+---------------------------------------------------------------------
+-- HELPER UI
+---------------------------------------------------------------------
+local function obj(class,parent,props)
+ local o=Instance.new(class)
+ for k,v in pairs(props or {}) do o[k]=v end
+ o.Parent=parent
+ return o
+end
+local function round(o,n) obj("UICorner",o,{CornerRadius=UDim.new(0,n or 8)}) end
+local function stroke(o,color,th,tr)
+ return obj("UIStroke",o,{Color=color,Thickness=th or 1.5,Transparency=tr or 0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border})
+end
+local function put(o,WW,x,y,w,h)
+ o.Position=UDim2.fromScale(x/WW,y)
+ if w then o.Size=UDim2.fromScale(w/WW,h) end
+end
+
+local function txt(parent,text,pos,size,ts,color,align)
+ return obj("TextLabel",parent,{
+  Text=text,Position=pos,Size=size,BackgroundTransparency=1,
+  TextColor3=color or C.white,Font=Enum.Font.GothamBold,TextSize=ts or 16,
+  TextWrapped=true,TextXAlignment=align or Enum.TextXAlignment.Center,ZIndex=18
+ })
+end
+
+local function btn(parent,text,pos,size,color,fn,ts)
+ local b=obj("TextButton",parent,{
+  Text=text,Position=pos,Size=size,BackgroundColor3=color or C.card,
+  TextColor3=(color==C.yellow) and C.dark or C.white,TextSize=ts or 15,
+  TextWrapped=true,Font=Enum.Font.GothamBold,AutoButtonColor=true,
+  ZIndex=30,BorderSizePixel=0
+ })
+ round(b,10)
+ stroke(b,Color3.new(0,0,0),1.5,.55)
+ if fn then b.Activated:Connect(fn) end
+ return b
+end
+
+-- panah digambar sendiri (tidak tergantung font)
+local function arrow(parent,dir,color)
+ local rot={left=0,up=90,right=180,down=270}
+ local c=obj("Frame",parent,{
+  BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),
+  Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(.62,.62),
+  Rotation=rot[dir],ZIndex=31
+ })
+ obj("UIAspectRatioConstraint",c,{AspectRatio=1})
+ for _,s in ipairs({-1,1}) do
+  local bar=obj("Frame",c,{
+   AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5+s*.12),
+   Size=UDim2.fromScale(.36,.13),Rotation=s*45,
+   BackgroundColor3=color or C.white,BorderSizePixel=0,ZIndex=31
+  })
+  round(bar,4)
+ end
+ return c
+end
+
+---------------------------------------------------------------------
+-- STATE UMUM
+---------------------------------------------------------------------
+local update,clean,start,showMenu,finish
+local connections={}
+local keyTap={}
+local held={left=false,right=false,up=false,down=false,fire=false}
+local runId,curIndex,finished=0,1,false
+local bests={}
+local scoreVal=0
+local soundOn=true
+
+---------------------------------------------------------------------
+-- SOUND EFFECT
+-- Kalau ada yang tidak bunyi, ganti id dengan "rbxassetid://NOMOR" dari Toolbox (Audio)
+---------------------------------------------------------------------
+local SFX={
+ click={"rbxasset://sounds/switch.wav",.5,1},
+ tap={"rbxasset://sounds/switch.wav",.35,1.25},
+ pop={"rbxasset://sounds/button.wav",.6,1.2},
+ hit={"rbxasset://sounds/button.wav",.8,.8},
+ place={"rbxasset://sounds/button.wav",.8,.9},
+ ping={"rbxasset://sounds/electronicpingshort.wav",.7,1},
+ coin={"rbxasset://sounds/electronicpingshort.wav",.6,1.5},
+ shoot={"rbxasset://sounds/snap.mp3",.35,1.8},
+ bad={"rbxasset://sounds/snap.mp3",.5,.7},
+ jump={"rbxasset://sounds/action_jump.mp3",.45,1.5},
+ land={"rbxasset://sounds/action_jump_land.mp3",.7,1},
+ boom={"rbxasset://sounds/impact_water.mp3",.8,1.1},
+ lose={"rbxasset://sounds/uuhhh.mp3",.8,1},
+}
+local function sfx(name,mul,vol)
+ if not soundOn then return end
+ local d=SFX[name]
+ if not d then return end
+ local s=Instance.new("Sound")
+ s.SoundId=d[1]
+ s.Volume=(vol or 1)*d[2]
+ s.PlaybackSpeed=d[3]*(mul or 1)
+ s.Parent=gui
+ s:Play()
+ Debris:AddItem(s,3)
+end
+local function seq(list)
+ for _,n in ipairs(list) do
+  task.delay(n[3] or 0,function() sfx(n[1],n[2]) end)
+ end
+end
+local WINSEQ={{"ping",1,0},{"ping",1.26,.12},{"ping",1.5,.24},{"ping",2,.38}}
+
+local function later(t,fn)
+ local id=runId
+ task.delay(t,function() if id==runId then fn() end end)
+end
+
+---------------------------------------------------------------------
+-- EFEK
+---------------------------------------------------------------------
+local function burst(parent,pos,color,n,spread)
+ for _=1,n do
+  local p=obj("Frame",parent,{
+   Size=UDim2.fromOffset(5,5),Position=pos,AnchorPoint=Vector2.new(.5,.5),
+   BackgroundColor3=color,BorderSizePixel=0,ZIndex=60
+  })
+  local a=math.random()*math.pi*2
+  local d=(spread or 28)*(.4+math.random()*.8)
+  TweenService:Create(p,TweenInfo.new(.4+math.random()*.25,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+   Position=pos+UDim2.fromOffset(math.cos(a)*d,math.sin(a)*d),BackgroundTransparency=1
+  }):Play()
+  Debris:AddItem(p,.8)
+ end
+end
+
+local function popText(parent,pos,text,color,size)
+ local l=obj("TextLabel",parent,{
+  AnchorPoint=Vector2.new(.5,.5),Position=pos,Size=UDim2.fromOffset(180,30),
+  BackgroundTransparency=1,Text=text,TextColor3=color or C.yellow,
+  TextStrokeTransparency=.3,Font=Enum.Font.GothamBlack,TextSize=size or 20,ZIndex=70
+ })
+ TweenService:Create(l,TweenInfo.new(.8,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+  Position=pos+UDim2.fromOffset(0,-34),TextTransparency=1,TextStrokeTransparency=1
+ }):Play()
+ Debris:AddItem(l,.9)
+end
+
+---------------------------------------------------------------------
+-- SPRITE PIXEL
+---------------------------------------------------------------------
+local function sprite(parent,rects,z)
+ local root=obj("Frame",parent,{BackgroundTransparency=1,Size=UDim2.fromScale(.1,.1),ZIndex=z or 15})
+ for i,r in ipairs(rects) do
+  local p=obj("Frame",root,{
+   Position=UDim2.fromScale(r[1],r[2]),Size=UDim2.fromScale(r[3],r[4]),
+   BackgroundColor3=r[5],BorderSizePixel=0,ZIndex=(z or 15)+i
+  })
+  if r[6] then p.Name=r[6] end
+ end
+ return root
+end
+
+local SP={
+ bird={
+  {.12,.22,.66,.56,C.yellow},
+  {.2,.55,.34,.2,Color3.fromRGB(255,170,40),"wing"},
+  {.62,.26,.2,.24,C.white},
+  {.72,.33,.1,.1,C.dark},
+  {.76,.5,.24,.18,C.red},
+  {.14,.64,.48,.12,Color3.fromRGB(255,235,160)},
+ },
+ ship={
+  {0,.42,.14,.16,C.orange},
+  {.12,.1,.34,.22,C.red},
+  {.12,.68,.34,.22,C.red},
+  {.1,.32,.7,.36,Color3.fromRGB(150,170,205)},
+  {.8,.4,.18,.2,C.white},
+  {.42,.26,.2,.2,C.cyan},
+ },
+ alien={
+  {.15,.2,.7,.6,C.green},
+  {.3,.04,.08,.18,C.green},{.62,.04,.08,.18,C.green},
+  {.24,.3,.2,.2,C.white},{.56,.3,.2,.2,C.white},
+  {.3,.36,.1,.1,C.dark},{.62,.36,.1,.1,C.dark},
+  {.3,.62,.4,.08,C.dark},
+  {.2,.8,.14,.16,C.green},{.66,.8,.14,.16,C.green},
+ },
+ rock={
+  {.1,.2,.8,.6,Color3.fromRGB(125,125,140)},
+  {.2,.1,.5,.2,Color3.fromRGB(150,150,165)},
+  {.25,.3,.18,.18,Color3.fromRGB(90,90,105)},
+  {.55,.5,.2,.2,Color3.fromRGB(90,90,105)},
+ },
+ fast={
+  {.05,.35,.7,.3,C.red},
+  {.6,.42,.35,.16,C.dark},
+  {.2,.15,.3,.2,C.orange},{.2,.65,.3,.2,C.orange},
+  {.0,.44,.12,.12,C.yellow},
+ },
+}
+local function carTop(color)
+ return {
+  {.15,.05,.7,.9,color},
+  {.25,.28,.5,.2,Color3.fromRGB(150,215,255)},
+  {.25,.64,.5,.14,C.dark},
+  {.04,.14,.14,.22,C.dark},{.82,.14,.14,.22,C.dark},
+  {.04,.64,.14,.22,C.dark},{.82,.64,.14,.22,C.dark},
+  {.2,.04,.16,.06,C.yellow},{.64,.04,.16,.06,C.yellow},
+ }
+end
+local function moleRects(kind)
+ if kind=="bomb" then
+  return {
+   {.14,.2,.72,.8,Color3.fromRGB(45,45,55)},
+   {.4,.02,.08,.2,Color3.fromRGB(150,110,60)},
+   {.46,0,.12,.1,C.orange},
+   {.28,.45,.16,.16,C.red},{.58,.45,.16,.16,C.red},
+   {.34,.74,.32,.08,C.red},
+  }
+ end
+ local body=(kind=="gold") and C.yellow or Color3.fromRGB(150,100,60)
+ return {
+  {.12,.12,.76,.88,body},
+  {.04,.12,.14,.2,body},{.82,.12,.14,.2,body},
+  {.28,.34,.16,.16,C.white},{.58,.34,.16,.16,C.white},
+  {.34,.4,.08,.08,C.dark},{.64,.4,.08,.08,C.dark},
+  {.4,.58,.2,.14,C.pink},
+ }
+end
+
+---------------------------------------------------------------------
+-- KERANGKA HUB
+---------------------------------------------------------------------
+local panel=obj("Frame",gui,{
+ Position=UDim2.new(0,10,0,6),Size=UDim2.new(1,-20,1,-12),
+ BackgroundColor3=C.bg,BorderSizePixel=0,ZIndex=5
+})
+round(panel,14)
+stroke(panel,C.line,2)
+
+local header=obj("Frame",panel,{
+ Size=UDim2.new(1,0,0,40),BackgroundColor3=C.panel,BorderSizePixel=0,ZIndex=6
+})
+round(header,12)
+obj("TextLabel",header,{
+ Text="PIXEL ARCADE V5",Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,
+ TextColor3=C.yellow,Font=Enum.Font.GothamBlack,TextSize=20,ZIndex=7
+})
+
+local body=obj("Frame",panel,{
+ Position=UDim2.new(0,8,0,46),Size=UDim2.new(1,-16,1,-54),
+ BackgroundTransparency=1,ZIndex=6
+})
+
+-- tombol buka (hanya muncul saat panel ditutup)
+local toggle=btn(gui,"🎮 HUB",UDim2.new(1,-120,1,-56),UDim2.fromOffset(108,44),C.yellow,nil,16)
+toggle.ZIndex=100
+toggle.Visible=false
+
+-- MENU
+local names={
+ "Flappy Bird","Snake","Brick Breaker","Space Shooter",
+ "Pixel Racing","Minesweeper","Whack-a-Mole","Tic-Tac-Toe",
+ "Pixel Pong VS CPU","Tetris Pixel","Block Blast"
+}
+local icons={"🐦","🐍","🧱","🚀","🏎","💣","🔨","⭕","🏓","🧩","🔷"}
+local descs={
+ "Tap untuk terbang","Makan apel","Hancurkan bata","Tembak musuh",
+ "Hindari mobil","Cari area aman","Pukul tikus","Lawan komputer",
+ "Kalahkan CPU","Susun balok","Seret balok"
+}
+local accents={C.yellow,C.green,C.red,C.blue,C.orange,C.cyan,C.pink,C.purple,C.green,C.cyan,C.blue}
+
+local menu=obj("ScrollingFrame",body,{
+ Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,
+ AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),
+ ScrollBarThickness=5,ZIndex=7
+})
+obj("UIGridLayout",menu,{
+ CellSize=UDim2.new(.25,-8,0,84),CellPadding=UDim2.fromOffset(8,8),
+ SortOrder=Enum.SortOrder.LayoutOrder
+})
+obj("UIPadding",menu,{PaddingTop=UDim.new(0,2),PaddingRight=UDim.new(0,6)})
+local bestLbls={}
+
+-- AREA GAME
+local area=obj("Frame",body,{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Visible=false,ZIndex=7})
+
+local hud=obj("Frame",area,{Size=UDim2.new(1,0,0,28),BackgroundColor3=C.panel,BorderSizePixel=0,ZIndex=8})
+round(hud,8)
+local hudName=txt(hud,"",UDim2.new(0,10,0,0),UDim2.new(.4,0,1,0),15,C.yellow,Enum.TextXAlignment.Left)
+local hudScore=txt(hud,"SKOR 0",UDim2.new(.4,0,0,0),UDim2.new(.3,0,1,0),15,C.white,Enum.TextXAlignment.Center)
+local hudBest=txt(hud,"TERBAIK 0",UDim2.new(.7,0,0,0),UDim2.new(.3,-10,1,0),13,C.dim,Enum.TextXAlignment.Right)
+
+local stage=obj("Frame",area,{
+ Position=UDim2.new(0,0,0,32),Size=UDim2.new(1,0,1,-70),
+ BackgroundColor3=C.panel,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8
+})
+round(stage,10)
+
+local bar=obj("Frame",area,{
+ AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,0,1,0),
+ Size=UDim2.new(1,0,0,34),BackgroundTransparency=1,ZIndex=8
+})
+btn(bar,"RESTART",UDim2.new(0,0,0,0),UDim2.new(.49,0,1,0),C.green,function()
+ sfx("click") start(curIndex)
+end,15)
+btn(bar,"MENU",UDim2.new(.51,0,0,0),UDim2.new(.49,0,1,0),C.red,function()
+ sfx("click") showMenu()
+end,15)
+
+---------------------------------------------------------------------
+-- INPUT KEYBOARD (WASD / PANAH / SPASI)
+---------------------------------------------------------------------
+local keyHold={
+ [Enum.KeyCode.W]="up",[Enum.KeyCode.Up]="up",
+ [Enum.KeyCode.S]="down",[Enum.KeyCode.Down]="down",
+ [Enum.KeyCode.A]="left",[Enum.KeyCode.Left]="left",
+ [Enum.KeyCode.D]="right",[Enum.KeyCode.Right]="right",
+ [Enum.KeyCode.Space]="fire",
+}
+local keyBound=false
+local function keyAction(_,state,io)
+ local h=keyHold[io.KeyCode]
+ if h then held[h]=(state==Enum.UserInputState.Begin) end
+ if state==Enum.UserInputState.Begin then
+  local fn=keyTap[io.KeyCode]
+  if fn then fn() end
+ end
+ return Enum.ContextActionResult.Sink
+end
+local function bindKeys()
+ if keyBound then return end
+ keyBound=true
+ CAS:BindActionAtPriority("ArcadeKeys",keyAction,false,Enum.ContextActionPriority.High.Value,
+  Enum.KeyCode.W,Enum.KeyCode.A,Enum.KeyCode.S,Enum.KeyCode.D,
+  Enum.KeyCode.Up,Enum.KeyCode.Down,Enum.KeyCode.Left,Enum.KeyCode.Right,Enum.KeyCode.Space)
+end
+local function unbindKeys()
+ if not keyBound then return end
+ keyBound=false
+ CAS:UnbindAction("ArcadeKeys")
+ for k in pairs(held) do held[k]=false end
+end
+
+local soundBtn
+local function setOpen(v)
+ panel.Visible=v
+ toggle.Visible=not v
+ if v and area.Visible then bindKeys() else unbindKeys() end
+end
+btn(header,"X",UDim2.new(1,-42,0,4),UDim2.fromOffset(34,32),C.red,function() sfx("click") setOpen(false) end,16)
+soundBtn=btn(header,"🔊",UDim2.new(1,-84,0,4),UDim2.fromOffset(34,32),C.card,function()
+ soundOn=not soundOn
+ soundBtn.Text=soundOn and "🔊" or "🔇"
+ sfx("click")
+end,16)
+toggle.Activated:Connect(function() setOpen(true) end)
+
+---------------------------------------------------------------------
+-- UTILITAS GAME
+---------------------------------------------------------------------
+local function clear()
+ if clean then pcall(clean) end
+ clean=nil
+ update=nil
+ for _,c in ipairs(connections) do c:Disconnect() end
+ table.clear(connections)
+ table.clear(keyTap)
+ for k in pairs(held) do held[k]=false end
+ for _,v in ipairs(stage:GetChildren()) do
+  if v:IsA("GuiObject") then v:Destroy() end
+ end
+end
+
+local function setScore(v)
+ scoreVal=v
+ if v>(bests[curIndex] or 0) then bests[curIndex]=v end
+ hudScore.Text="SKOR "..v
+ hudBest.Text="TERBAIK "..(bests[curIndex] or 0)
+end
+
+-- area permainan dengan rasio tetap + sisi kiri/kanan untuk kontrol
+local function field(aspect)
+ local f=obj("Frame",stage,{
+  AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
+  Size=UDim2.new(.6,0,1,-8),BackgroundColor3=C.field,BorderSizePixel=0,
+  ClipsDescendants=true,ZIndex=10
+ })
+ round(f,10)
+ stroke(f,C.line,2)
+ obj("UIAspectRatioConstraint",f,{AspectRatio=aspect,AspectType=Enum.AspectType.FitWithinMaxSize})
+ local L=obj("Frame",stage,{Position=UDim2.new(0,6,0,4),Size=UDim2.new(.19,0,1,-8),BackgroundTransparency=1,ZIndex=20})
+ local R=obj("Frame",stage,{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,-6,0,4),Size=UDim2.new(.19,0,1,-8),BackgroundTransparency=1,ZIndex=20})
+ return f,L,R
+end
+
+local function holdBtn(parent,key,pos,size,color,dir,text)
+ local b=btn(parent,text or "",pos,size,color,nil,16)
+ if dir then arrow(b,dir,color==C.yellow and C.dark or C.white) end
+ local function set(v)
+  held[key]=v
+  b.BackgroundTransparency=v and .3 or 0
+ end
+ local function isP(io) return io.UserInputType==Enum.UserInputType.Touch or io.UserInputType==Enum.UserInputType.MouseButton1 end
+ b.InputBegan:Connect(function(io) if isP(io) then set(true) end end)
+ b.InputEnded:Connect(function(io) if isP(io) then set(false) end end)
+ return b
+end
+
+local function hint(parent,text,y)
+ local l=txt(parent,text,UDim2.new(0,0,0,y or 0),UDim2.new(1,0,0,60),12,C.dim)
+ return l
+end
+
+local function isPointer(io)
+ return io.UserInputType==Enum.UserInputType.Touch or io.UserInputType==Enum.UserInputType.MouseButton1
+end
+
+-- layar game over / menang
+finish=function(msg,win)
+ if finished then return end
+ finished=true
+ update=nil
+ for k in pairs(held) do held[k]=false end
+ if win then seq(WINSEQ) end
+ local ov=obj("Frame",stage,{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=1,ZIndex=80,Active=true})
+ TweenService:Create(ov,TweenInfo.new(.3),{BackgroundTransparency=.45}):Play()
+ local card=obj("Frame",ov,{
+  AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
+  Size=UDim2.fromOffset(300,150),BackgroundColor3=C.panel,BorderSizePixel=0,ZIndex=81
+ })
+ round(card,14)
+ stroke(card,win and C.green or C.red,2.5)
+ local t=txt(card,msg,UDim2.new(0,0,0,10),UDim2.new(1,0,0,40),28,win and C.green or C.yellow)
+ t.Font=Enum.Font.GothamBlack
+ txt(card,"Skor "..scoreVal.."   |   Terbaik "..(bests[curIndex] or 0),UDim2.new(0,0,0,52),UDim2.new(1,0,0,24),16,C.white)
+ btn(card,"MAIN LAGI",UDim2.new(.06,0,1,-58),UDim2.new(.55,-6,0,44),C.green,function() sfx("click") start(curIndex) end,16)
+ btn(card,"MENU",UDim2.new(.61,0,1,-58),UDim2.new(.33,0,0,44),C.red,function() sfx("click") showMenu() end,16)
+end
+
+local games={}
+
+---------------------------------------------------------------------
+-- 1 FLAPPY BIRD
+---------------------------------------------------------------------
+games[1]=function()
+ local AR=1.5
+ local f,L,R=field(AR)
+ f.BackgroundColor3=C.white
+ obj("UIGradient",f,{Color=ColorSequence.new(Color3.fromRGB(80,165,255),Color3.fromRGB(200,238,255)),Rotation=90})
+ local clouds={}
+ for i=1,4 do
+  local c=obj("Frame",f,{BackgroundColor3=C.white,BackgroundTransparency=.2,Size=UDim2.fromScale(.15+math.random()*.08,.07),BorderSizePixel=0,ZIndex=11})
+  round(c,10)
+  clouds[i]={f=c,x=math.random(),y=.06+math.random()*.35,s=.02+math.random()*.03}
+  c.Position=UDim2.fromScale(clouds[i].x,clouds[i].y)
+ end
+ local ground=obj("Frame",f,{Position=UDim2.fromScale(0,.9),Size=UDim2.fromScale(1,.1),BackgroundColor3=Color3.fromRGB(222,200,120),BorderSizePixel=0,ZIndex=16})
+ obj("Frame",ground,{Size=UDim2.new(1,0,0,6),BackgroundColor3=C.green,BorderSizePixel=0,ZIndex=17})
+
+ local bh=.11
+ local bw=bh/AR
+ local bx=.2
+ local bird=sprite(f,SP.bird,18)
+ bird.Size=UDim2.fromScale(bw,bh)
+ local wing=bird:FindFirstChild("wing")
+ local y,vy=.45,0
+ local pipes,score,t0=0,0,0
+ pipes={}
+ local started,dead=false,false
+ local pw,gapH=.13,.30
+ local tip=txt(f,"TAP UNTUK TERBANG",UDim2.new(.1,0,.18,0),UDim2.new(.8,0,0,24),16,C.white)
+ tip.ZIndex=30
+ tip.TextStrokeTransparency=.4
+
+ local function newPipe()
+  local gy=.27+math.random()*.36
+  local botY=gy+gapH/2
+  local topH=gy-gapH/2
+  local top=obj("Frame",f,{Size=UDim2.fromScale(pw,topH),Position=UDim2.fromScale(1.05,0),BackgroundColor3=Color3.fromRGB(80,185,90),BorderSizePixel=0,ZIndex=14})
+  obj("Frame",top,{Size=UDim2.new(1.24,0,0,12),Position=UDim2.new(-.12,0,1,-12),BackgroundColor3=Color3.fromRGB(110,220,120),BorderSizePixel=0,ZIndex=15})
+  local bot=obj("Frame",f,{Size=UDim2.fromScale(pw,.9-botY),Position=UDim2.fromScale(1.05,botY),BackgroundColor3=Color3.fromRGB(80,185,90),BorderSizePixel=0,ZIndex=14})
+  obj("Frame",bot,{Size=UDim2.new(1.24,0,0,12),Position=UDim2.new(-.12,0,0,0),BackgroundColor3=Color3.fromRGB(110,220,120),BorderSizePixel=0,ZIndex=15})
+  table.insert(pipes,{x=1.05,top=top,bot=bot,gy=gy,botY=botY,passed=false})
+ end
+
+ local function die()
+  if dead then return end
+  dead=true
+  vy=-.4
+  sfx("hit")
+  later(.12,function() sfx("lose") end)
+  burst(f,UDim2.fromScale(bx+bw/2,y+bh/2),C.yellow,14,34)
+  later(.9,function() finish("GAME OVER") end)
+ end
+
+ local function jump()
+  if dead then return end
+  if not started then started=true tip:Destroy() end
+  vy=-.80
+  sfx("jump")
+  if wing then
+   wing.Rotation=-35
+   TweenService:Create(wing,TweenInfo.new(.15),{Rotation=0}):Play()
+  end
+ end
+
+ f.InputBegan:Connect(function(io) if isPointer(io) then jump() end end)
+ keyTap[Enum.KeyCode.Space]=jump
+ keyTap[Enum.KeyCode.W]=jump
+ keyTap[Enum.KeyCode.Up]=jump
+ hint(L,"Tap layar atau tombol FLAP untuk terbang",70)
+ btn(R,"FLAP",UDim2.new(0,0,.5,-45),UDim2.new(1,0,0,90),C.yellow,jump,22)
+
+ update=function(dt)
+  for _,c in ipairs(clouds) do
+   c.x-=c.s*dt
+   if c.x<-.25 then c.x=1.05 end
+   c.f.Position=UDim2.fromScale(c.x,c.y)
+  end
+  if not started then
+   t0+=dt
+   y=.45+math.sin(t0*5)*.02
+   bird.Position=UDim2.fromScale(bx,y)
+   return
+  end
+  vy=math.min(vy+1.75*dt,1.15)
+  y+=vy*dt
+  if y<0 then y=0 vy=0 end
+  bird.Position=UDim2.fromScale(bx,y)
+  bird.Rotation=math.clamp(vy*55,-25,80)
+  if not dead then
+   local spd=.40+math.min(score,25)*.01
+   if #pipes==0 or pipes[#pipes].x<.58 then newPipe() end
+   for i=#pipes,1,-1 do
+    local p=pipes[i]
+    p.x-=spd*dt
+    p.top.Position=UDim2.fromScale(p.x,0)
+    p.bot.Position=UDim2.fromScale(p.x,p.botY)
+    if bx+bw-.012>p.x and bx+.012<p.x+pw then
+     if y+.012<p.gy-gapH/2 or y+bh-.012>p.botY then die() end
     end
-    table.clear(bricks)
-end
-
-local function makeBricks()
-    clearBricks()
-
-    local gap = 4
-    local areaWidth = playArea.AbsoluteSize.X
-    local brickWidth = math.max(20, (areaWidth - gap * (brickCols + 1)) / brickCols)
-    local brickHeight = math.max(12, math.min(20, playArea.AbsoluteSize.Y * 0.035))
-
-    for row = 1, brickRows do
-        for col = 1, brickCols do
-            local brick = make("Frame", "Brick", playArea, {
-                Position = UDim2.fromOffset(
-                    gap + (col - 1) * (brickWidth + gap),
-                    18 + (row - 1) * (brickHeight + gap)
-                ),
-                Size = UDim2.fromOffset(brickWidth, brickHeight),
-                BackgroundColor3 = brickColors[row],
-                BorderSizePixel = 0,
-                ZIndex = 3
-            })
-            round(brick, 4)
-            table.insert(bricks, {frame = brick, alive = true})
-        end
+    if not p.passed and p.x+pw<bx then
+     p.passed=true
+     score+=1
+     setScore(score)
+     sfx("ping")
     end
-end
-
-local function resetBrick()
-    bScore, bLives, bAlive = 0, 3, true
-    ballX, ballY = 0.5, 0.78
-    ballVX, ballVY = 0.34, -0.48
-    paddleX = 0.5
-    paddleDir = 0
-    ballStarted = false
-    bOver.Visible = false
-    bScoreLabel.Text = "SKOR: 0"
-    bLivesLabel.Text = "NYAWA: 3"
-    paddle.Position = UDim2.new(0.5, 0, 0.91, 0)
-    ball.Position = UDim2.fromScale(ballX, ballY)
-    makeBricks()
-end
-
-local function finishBrick()
-    bAlive = false
-    bFinal.Text = "Skor: " .. bScore
-    bOver.Visible = true
-end
-
-bRestart.Activated:Connect(resetBrick)
-
--- Move paddle with touch/mouse. Tap area to launch ball.
-local function movePaddleFromScreenX(screenX)
-    local areaPos = playArea.AbsolutePosition
-    local areaSize = playArea.AbsoluteSize
-    if areaSize.X <= 0 then return end
-    paddleX = math.clamp((screenX - areaPos.X) / areaSize.X, 0.12, 0.88)
-    paddle.Position = UDim2.new(paddleX, 0, 0.91, 0)
-end
-
-playArea.InputBegan:Connect(function(input)
-    if currentGame ~= "brick" or hidden or not bAlive then return end
-
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        movePaddleFromScreenX(input.Position.X)
-        ballStarted = true
+    if p.x<-.2 then
+     p.top:Destroy() p.bot:Destroy()
+     table.remove(pipes,i)
     end
+   end
+   if y+bh>=.9 then y=.9-bh die() end
+  else
+   if y+bh>=.9 then y=.9-bh vy=0 end
+  end
+ end
+end
+
+---------------------------------------------------------------------
+-- 2 SNAKE
+---------------------------------------------------------------------
+games[2]=function()
+ local COLS,ROWS=16,11
+ local f,L,R=field(COLS/ROWS)
+ local cells={}
+ for x=1,COLS do
+  cells[x]={}
+  for y=1,ROWS do
+   cells[x][y]=obj("Frame",f,{
+    Position=UDim2.new((x-1)/COLS,1,(y-1)/ROWS,1),
+    Size=UDim2.new(1/COLS,-2,1/ROWS,-2),BorderSizePixel=0,ZIndex=11
+   })
+  end
+ end
+ local body={{x=8,y=6},{x=7,y=6},{x=6,y=6}}
+ local dir={x=1,y=0}
+ local dirQ={}
+ local food
+ local score,acc=0,0
+ local dead=false
+ local base1,base2=Color3.fromRGB(26,40,56),Color3.fromRGB(31,47,66)
+
+ local function spawnFood()
+  local free={}
+  local used={}
+  for _,v in ipairs(body) do used[v.x*100+v.y]=true end
+  for x=1,COLS do for y=1,ROWS do
+   if not used[x*100+y] then table.insert(free,{x=x,y=y}) end
+  end end
+  if #free==0 then return false end
+  food=free[math.random(#free)]
+  return true
+ end
+ local function draw()
+  for x=1,COLS do for y=1,ROWS do
+   cells[x][y].BackgroundColor3=((x+y)%2==0) and base1 or base2
+  end end
+  if food then cells[food.x][food.y].BackgroundColor3=C.red end
+  for i,v in ipairs(body) do
+   if i==1 then
+    cells[v.x][v.y].BackgroundColor3=Color3.fromRGB(130,255,170)
+   else
+    cells[v.x][v.y].BackgroundColor3=Color3.fromRGB(60,205,115):Lerp(Color3.fromRGB(30,115,80),i/#body)
+   end
+  end
+ end
+ local function turn(x,y)
+  local last=dirQ[#dirQ] or dir
+  if (x==-last.x and y==-last.y) or (x==last.x and y==last.y) then return end
+  if #dirQ<2 then
+   table.insert(dirQ,{x=x,y=y})
+   sfx("tap")
+  end
+ end
+ local function die()
+  if dead then return end
+  dead=true
+  sfx("lose")
+  local h=body[1]
+  burst(f,UDim2.fromScale((h.x-.5)/COLS,(h.y-.5)/ROWS),C.green,14,30)
+  later(.7,function() finish("GAME OVER") end)
+ end
+
+ -- D-pad
+ local dp=obj("Frame",L,{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(148,148),BackgroundTransparency=1,ZIndex=21})
+ local function db(dir2,px,py,fn)
+  local b=btn(dp,"",UDim2.fromOffset(px,py),UDim2.fromOffset(48,48),C.yellow,fn,16)
+  arrow(b,dir2,C.dark)
+ end
+ db("up",50,0,function() turn(0,-1) end)
+ db("left",0,50,function() turn(-1,0) end)
+ db("right",100,50,function() turn(1,0) end)
+ db("down",50,100,function() turn(0,1) end)
+ hint(R,"Geser jari di layar atau pakai tombol arah",70)
+
+ keyTap[Enum.KeyCode.W]=function() turn(0,-1) end
+ keyTap[Enum.KeyCode.Up]=function() turn(0,-1) end
+ keyTap[Enum.KeyCode.S]=function() turn(0,1) end
+ keyTap[Enum.KeyCode.Down]=function() turn(0,1) end
+ keyTap[Enum.KeyCode.A]=function() turn(-1,0) end
+ keyTap[Enum.KeyCode.Left]=function() turn(-1,0) end
+ keyTap[Enum.KeyCode.D]=function() turn(1,0) end
+ keyTap[Enum.KeyCode.Right]=function() turn(1,0) end
+
+ -- geser (swipe)
+ local sx,sy,sid
+ f.InputBegan:Connect(function(io)
+  if isPointer(io) then sx,sy,sid=io.Position.X,io.Position.Y,io end
+ end)
+ f.InputChanged:Connect(function(io)
+  if sid and (io==sid or io.UserInputType==Enum.UserInputType.MouseMovement) then
+   local dx,dy=io.Position.X-sx,io.Position.Y-sy
+   if math.abs(dx)>24 or math.abs(dy)>24 then
+    if math.abs(dx)>math.abs(dy) then turn(dx>0 and 1 or -1,0) else turn(0,dy>0 and 1 or -1) end
+    sx,sy=io.Position.X,io.Position.Y
+   end
+  end
+ end)
+ f.InputEnded:Connect(function(io) if io==sid then sid=nil end end)
+
+ spawnFood()
+ draw()
+ update=function(dt)
+  if dead then return end
+  acc+=dt
+  local step=math.max(.085,.17-score*.0035)
+  if acc<step then return end
+  acc-=step
+  if #dirQ>0 then dir=table.remove(dirQ,1) end
+  local h=body[1]
+  local nx,ny=h.x+dir.x,h.y+dir.y
+  if nx<1 or nx>COLS or ny<1 or ny>ROWS then die() return end
+  local eating=food and nx==food.x and ny==food.y
+  for i,v in ipairs(body) do
+   if not (i==#body and not eating) and v.x==nx and v.y==ny then die() return end
+  end
+  table.insert(body,1,{x=nx,y=ny})
+  if eating then
+   score+=1
+   setScore(score)
+   sfx("coin")
+   burst(f,UDim2.fromScale((nx-.5)/COLS,(ny-.5)/ROWS),C.red,8,20)
+   if not spawnFood() then
+    dead=true
+    draw()
+    finish("MENANG!",true)
+    return
+   end
+  else
+   table.remove(body)
+  end
+  draw()
+ end
+end
+
+---------------------------------------------------------------------
+-- 3 BRICK BREAKER
+---------------------------------------------------------------------
+games[3]=function()
+ local AR=1.45
+ local WW=AR
+ local f,L,R=field(AR)
+ f.BackgroundColor3=Color3.fromRGB(14,20,40)
+ local PW,PH,PY=.30,.034,.92
+ local px=WW/2
+ local paddle=obj("Frame",f,{BackgroundColor3=C.green,BorderSizePixel=0,ZIndex=16})
+ round(paddle,6)
+ local rad=.03
+ local ball=obj("Frame",f,{BackgroundColor3=C.white,BorderSizePixel=0,ZIndex=17})
+ round(ball,999)
+ local bx,by,vx,vy=px,PY-rad,0,0
+ local spd=.95
+ local launched,launchT=false,1.2
+ local lives,level,score=3,1,0
+ local bricks={}
+ local info=txt(f,"",UDim2.new(0,6,0,2),UDim2.new(1,-12,0,16),12,C.dim,Enum.TextXAlignment.Left)
+ info.ZIndex=22
+ local function updInfo() info.Text="VIDA "..lives.."   NIVEL "..level end
+ local rowCols={C.red,C.orange,C.yellow,C.green,C.blue}
+
+ local function buildBricks()
+  for _,b in ipairs(bricks) do b.f:Destroy() end
+  bricks={}
+  local cols,rows=8,5
+  local gap=.012
+  local bw=(WW-.1-gap*(cols-1))/cols
+  local bh=.062
+  for rr=1,rows do for cc=1,cols do
+   local x=.05+(cc-1)*(bw+gap)
+   local y=.11+(rr-1)*(bh+gap)
+   local fr=obj("Frame",f,{BackgroundColor3=rowCols[rr],BorderSizePixel=0,ZIndex=14})
+   round(fr,4)
+   put(fr,WW,x,y,bw,bh)
+   obj("Frame",fr,{Size=UDim2.fromScale(1,.3),BackgroundColor3=C.white,BackgroundTransparency=.7,BorderSizePixel=0,ZIndex=15})
+   table.insert(bricks,{f=fr,x=x,y=y,w=bw,h=bh,hp=(level>=2 and rr<=2) and 2 or 1,row=rr})
+  end end
+ end
+ local function placeAll()
+  put(paddle,WW,px-PW/2,PY,PW,PH)
+  put(ball,WW,bx-rad,by-rad,rad*2,rad*2)
+ end
+ local function launch()
+  if launched then return end
+  launched=true
+  local ang=math.rad(math.random(-25,25))
+  vx=spd*math.sin(ang)
+  vy=-spd*math.cos(ang)
+  sfx("tap")
+ end
+ local function setSpeed()
+  local m=math.sqrt(vx*vx+vy*vy)
+  if m>0 then vx=vx/m*spd vy=vy/m*spd end
+ end
+
+ -- kontrol
+ local dragging=false
+ local function setPx(io)
+  local rel=(io.Position.X-f.AbsolutePosition.X)/f.AbsoluteSize.X*WW
+  px=math.clamp(rel,PW/2,WW-PW/2)
+ end
+ f.InputBegan:Connect(function(io)
+  if isPointer(io) then dragging=true setPx(io) launch() end
+ end)
+ f.InputChanged:Connect(function(io)
+  if dragging and (io.UserInputType==Enum.UserInputType.Touch or io.UserInputType==Enum.UserInputType.MouseMovement) then setPx(io) end
+ end)
+ f.InputEnded:Connect(function(io) if isPointer(io) then dragging=false end end)
+ holdBtn(L,"left",UDim2.new(0,0,.5,-40),UDim2.new(1,0,0,80),C.yellow,"left")
+ holdBtn(R,"right",UDim2.new(0,0,.5,-40),UDim2.new(1,0,0,80),C.yellow,"right")
+ keyTap[Enum.KeyCode.Space]=launch
+
+ buildBricks()
+ updInfo()
+ placeAll()
+
+ update=function(dt)
+  local mv=(held.right and 1 or 0)-(held.left and 1 or 0)
+  if mv~=0 then px=math.clamp(px+mv*1.5*dt,PW/2,WW-PW/2) end
+  if not launched then
+   bx=px
+   by=PY-rad-.002
+   launchT-=dt
+   if launchT<=0 then launch() end
+   placeAll()
+   return
+  end
+  local sp=math.sqrt(vx*vx+vy*vy)
+  local n=math.max(1,math.ceil(sp*dt/.012))
+  local sdt=dt/n
+  for _=1,n do
+   bx+=vx*sdt
+   by+=vy*sdt
+   if bx<rad then bx=rad vx=math.abs(vx) sfx("tap",.8) end
+   if bx>WW-rad then bx=WW-rad vx=-math.abs(vx) sfx("tap",.8) end
+   if by<rad then by=rad vy=math.abs(vy) sfx("tap",.8) end
+   -- paddle
+   if vy>0 and by+rad>=PY and by-rad<=PY+PH and bx>=px-PW/2-rad and bx<=px+PW/2+rad then
+    local off=math.clamp((bx-px)/(PW/2),-1,1)
+    local ang=off*math.rad(60)
+    vx=spd*math.sin(ang)
+    vy=-spd*math.cos(ang)
+    by=PY-rad
+    sfx("hit")
+   end
+   -- bricks
+   for i=#bricks,1,-1 do
+    local b=bricks[i]
+    local cx=math.clamp(bx,b.x,b.x+b.w)
+    local cy=math.clamp(by,b.y,b.y+b.h)
+    local dx,dy=bx-cx,by-cy
+    if dx*dx+dy*dy<rad*rad then
+     if math.abs(dx)>math.abs(dy) then
+      vx=(dx>0) and math.abs(vx) or -math.abs(vx)
+     else
+      vy=(dy>0) and math.abs(vy) or -math.abs(vy)
+     end
+     b.hp-=1
+     if b.hp<=0 then
+      burst(f,UDim2.fromScale((b.x+b.w/2)/WW,b.y+b.h/2),rowCols[b.row],8,22)
+      b.f:Destroy()
+      table.remove(bricks,i)
+      score+=10*level
+      setScore(score)
+      sfx("pop",1+(5-b.row)*.08)
+     else
+      b.f.BackgroundColor3=rowCols[b.row]:Lerp(C.dark,.45)
+      sfx("hit",1.3)
+     end
+     spd=math.min(spd+.012,1.7)
+     setSpeed()
+     break
+    end
+   end
+   if by>1+rad then
+    lives-=1
+    sfx("lose")
+    updInfo()
+    if lives<=0 then
+     finish("GAME OVER")
+     return
+    end
+    launched=false
+    launchT=1.2
+    vx,vy=0,0
+    break
+   end
+  end
+  if #bricks==0 then
+   level+=1
+   spd+=.08
+   seq(WINSEQ)
+   popText(f,UDim2.fromScale(.5,.5),"NIVEL "..level,C.yellow,26)
+   buildBricks()
+   launched=false
+   launchT=1.4
+   vx,vy=0,0
+   updInfo()
+  end
+  placeAll()
+ end
+end
+
+---------------------------------------------------------------------
+-- 4 SPACE SHOOTER (menyamping)
+---------------------------------------------------------------------
+games[4]=function()
+ local AR=1.6
+ local WW=AR
+ local f,L,R=field(AR)
+ f.BackgroundColor3=Color3.fromRGB(8,10,26)
+ local stars={}
+ for i=1,34 do
+  local s=obj("Frame",f,{Size=UDim2.fromOffset(2,2),BackgroundColor3=C.white,BackgroundTransparency=math.random()*.6,BorderSizePixel=0,ZIndex=11})
+  stars[i]={f=s,x=math.random()*WW,y=math.random(),v=.05+math.random()*.25}
+ end
+ local sw,sh=.17,.13
+ local ship=sprite(f,SP.ship,15)
+ local sx=.05
+ local sy=.5
+ local lives,score,inv=3,0,0
+ local fireT,spawnT,powerT=0,1,0
+ local bullets,enemies,pickups={}, {}, {}
+ local dead=false
+ local info=txt(f,"",UDim2.new(0,6,0,2),UDim2.new(1,-12,0,16),12,C.dim,Enum.TextXAlignment.Left)
+ info.ZIndex=22
+ local function updInfo()
+  info.Text="VIDA "..lives..(powerT>0 and ("   TRIPLE "..math.ceil(powerT).."s") or "")
+ end
+ local function rect(ax,ay,aw,ah,bx,by,bw,bh) return ax<bx+bw and bx<ax+aw and ay<by+bh and by<ay+ah end
+
+ local function fire()
+  if fireT>0 or dead then return end
+  fireT=.2
+  local function mk(vy)
+   local fr=obj("Frame",f,{BackgroundColor3=C.yellow,BorderSizePixel=0,ZIndex=14})
+   round(fr,3)
+   table.insert(bullets,{f=fr,x=sx+sw,y=sy,vy=vy})
+  end
+  mk(0)
+  if powerT>0 then mk(-.22) mk(.22) end
+  sfx("shoot")
+ end
+ local function spawn()
+  local r=math.random()
+  local lv=1+math.floor(score/150)
+  local e
+  if r<.5 then e={kind="alien",w=.13,h=.12,hp=1,v=.36+lv*.03,pts=10,amp=.06}
+  elseif r<.8 then e={kind="rock",w=.15,h=.15,hp=2,v=.26+lv*.02,pts=20,amp=0}
+  else e={kind="fast",w=.14,h=.09,hp=1,v=.75+lv*.04,pts=15,amp=0} end
+  e.x=WW+.05
+  e.y0=.05+math.random()*(.9-e.h)
+  e.y=e.y0
+  e.t=math.random()*6
+  e.f=sprite(f,SP[e.kind],15)
+  table.insert(enemies,e)
+ end
+ local function hurt()
+  lives-=1
+  inv=1.6
+  sfx("hit")
+  burst(f,UDim2.fromScale((sx+sw/2)/WW,sy),C.orange,12,30)
+  updInfo()
+  if lives<=0 then
+   dead=true
+   sfx("lose")
+   ship.Visible=false
+   later(.7,function() finish("GAME OVER") end)
+  end
+ end
+
+ -- kontrol
+ local function setSy(io)
+  sy=math.clamp((io.Position.Y-f.AbsolutePosition.Y)/f.AbsoluteSize.Y,.08,.92)
+ end
+ local drag=false
+ f.InputBegan:Connect(function(io) if isPointer(io) then drag=true setSy(io) end end)
+ f.InputChanged:Connect(function(io)
+  if drag and (io.UserInputType==Enum.UserInputType.Touch or io.UserInputType==Enum.UserInputType.MouseMovement) then
+   -- posisi Y sentuhan sudah dikurangi inset, aman untuk dipakai relatif
+   setSy(io)
+  end
+ end)
+ f.InputEnded:Connect(function(io) if isPointer(io) then drag=false end end)
+ holdBtn(L,"up",UDim2.new(0,0,.5,-76),UDim2.new(1,0,0,70),C.yellow,"up")
+ holdBtn(L,"down",UDim2.new(0,0,.5,6),UDim2.new(1,0,0,70),C.yellow,"down")
+ holdBtn(R,"fire",UDim2.new(0,0,.5,-50),UDim2.new(1,0,0,100),C.red,nil,"FIRE")
+ updInfo()
+
+ update=function(dt)
+  for _,s in ipairs(stars) do
+   s.x-=s.v*dt
+   if s.x<0 then s.x=WW s.y=math.random() end
+   s.f.Position=UDim2.fromScale(s.x/WW,s.y)
+  end
+  if dead then return end
+  local dy=(held.down and 1 or 0)-(held.up and 1 or 0)
+  if dy~=0 then sy=math.clamp(sy+dy*.9*dt,.08,.92) end
+  put(ship,WW,sx,sy-sh/2,sw,sh)
+  if inv>0 then
+   inv-=dt
+   ship.Visible=(math.floor(inv*10)%2==0)
+   if inv<=0 then ship.Visible=true end
+  end
+  if powerT>0 then powerT-=dt updInfo() end
+  fireT-=dt
+  if held.fire then fire() end
+
+  spawnT-=dt
+  if spawnT<=0 then
+   spawn()
+   spawnT=math.max(.4,1.0-score*.002)*(.7+math.random()*.6)
+  end
+
+  -- peluru
+  for i=#bullets,1,-1 do
+   local b=bullets[i]
+   b.x+=2.2*dt
+   b.y+=b.vy*dt
+   put(b.f,WW,b.x,b.y-.007,.05,.014)
+   if b.x>WW+.1 or b.y<0 or b.y>1 then b.f:Destroy() table.remove(bullets,i) end
+  end
+  -- musuh
+  for i=#enemies,1,-1 do
+   local e=enemies[i]
+   e.x-=e.v*dt
+   e.t+=dt
+   e.y=math.clamp(e.y0+math.sin(e.t*2)*e.amp,0,1-e.h)
+   put(e.f,WW,e.x,e.y,e.w,e.h)
+   local removed=false
+   for j=#bullets,1,-1 do
+    local b=bullets[j]
+    if rect(b.x,b.y-.007,.05,.014,e.x,e.y,e.w,e.h) then
+     b.f:Destroy()
+     table.remove(bullets,j)
+     e.hp-=1
+     if e.hp<=0 then
+      burst(f,UDim2.fromScale((e.x+e.w/2)/WW,e.y+e.h/2),C.orange,12,30)
+      sfx("boom",1+math.random()*.3)
+      score+=e.pts
+      setScore(score)
+      if math.random()<.1 then
+       local pf=obj("Frame",f,{Size=UDim2.fromScale(.04/WW,.05),BackgroundColor3=C.cyan,BorderSizePixel=0,ZIndex=14})
+       round(pf,999)
+       table.insert(pickups,{f=pf,x=e.x,y=e.y+e.h/2})
+      end
+      e.f:Destroy()
+      table.remove(enemies,i)
+      removed=true
+     else
+      sfx("hit",1.5)
+     end
+     break
+    end
+   end
+   if not removed then
+    if inv<=0 and rect(sx+.02,sy-sh/2+.02,sw-.04,sh-.04,e.x+.01,e.y+.01,e.w-.02,e.h-.02) then
+     burst(f,UDim2.fromScale((e.x+e.w/2)/WW,e.y+e.h/2),C.orange,10,26)
+     e.f:Destroy()
+     table.remove(enemies,i)
+     hurt()
+     if dead then return end
+    elseif e.x<-.25 then
+     e.f:Destroy()
+     table.remove(enemies,i)
+    end
+   end
+  end
+  -- power-up
+  for i=#pickups,1,-1 do
+   local p=pickups[i]
+   p.x-=.4*dt
+   put(p.f,WW,p.x,p.y-.025,.04,.05)
+   if rect(sx,sy-sh/2,sw,sh,p.x,p.y-.025,.04,.05) then
+    powerT=8
+    sfx("coin")
+    popText(f,UDim2.fromScale(p.x/WW,p.y),"TRIPLE!",C.cyan,16)
+    p.f:Destroy()
+    table.remove(pickups,i)
+    updInfo()
+   elseif p.x<-.1 then
+    p.f:Destroy()
+    table.remove(pickups,i)
+   end
+  end
+ end
+end
+
+---------------------------------------------------------------------
+-- 5 PIXEL RACING
+---------------------------------------------------------------------
+games[5]=function()
+ local AR=.85
+ local WW=AR
+ local f,L,R=field(AR)
+ f.BackgroundColor3=Color3.fromRGB(64,160,72)
+ local roadL,roadW=.13,.59
+ local laneW=roadW/3
+ local road=obj("Frame",f,{BackgroundColor3=Color3.fromRGB(54,58,70),BorderSizePixel=0,ZIndex=11})
+ put(road,WW,roadL,0,roadW,1)
+ for _,x in ipairs({roadL,roadL+roadW-.012}) do
+  local e=obj("Frame",f,{BackgroundColor3=C.white,BorderSizePixel=0,ZIndex=12})
+  put(e,WW,x,0,.012,1)
+ end
+ local dashes={}
+ for li=1,2 do for k=0,5 do
+  local d=obj("Frame",f,{BackgroundColor3=C.white,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=12})
+  table.insert(dashes,{f=d,x=roadL+laneW*li-.006,y=k*.2-.1})
+ end end
+ local trees={}
+ for k=0,4 do for _,x in ipairs({.035,.76}) do
+  local t=obj("Frame",f,{BackgroundColor3=Color3.fromRGB(34,110,52),BorderSizePixel=0,ZIndex=12})
+  round(t,6)
+  table.insert(trees,{f=t,x=x,y=k*.25+math.random()*.1})
+ end end
+
+ local pw,ph=.11,.18
+ local px,py=roadL+roadW/2,.74
+ local me=sprite(f,carTop(C.blue),16)
+ local obs,coins={}, {}
+ local colorsList={C.red,C.orange,C.pink,C.purple,C.cyan,C.green}
+ local elapsed,dist,bonus,spawnT=0,0,0,.8
+ local dead=false
+
+ local function rect(ax,ay,aw,ah,bx,by,bw,bh) return ax<bx+bw and bx<ax+aw and ay<by+bh and by<ay+ah end
+ local function spawnCar(lane)
+  local cx=roadL+laneW*(lane-.5)
+  local s=sprite(f,carTop(colorsList[math.random(#colorsList)]),15)
+  local oncoming=math.random()<.5
+  if oncoming then s.Rotation=180 end
+  table.insert(obs,{f=s,x=cx,y=-.25,k=oncoming and 1.45 or .55})
+ end
+ local function spawnCoin(lane)
+  local cx=roadL+laneW*(lane-.5)
+  local c=obj("Frame",f,{BackgroundColor3=C.yellow,BorderSizePixel=0,ZIndex=14})
+  round(c,999)
+  stroke(c,Color3.fromRGB(190,140,20),2)
+  table.insert(coins,{f=c,x=cx,y=-.1})
+ end
+
+ holdBtn(L,"left",UDim2.new(0,0,.5,-40),UDim2.new(1,0,0,80),C.yellow,"left")
+ holdBtn(R,"right",UDim2.new(0,0,.5,-40),UDim2.new(1,0,0,80),C.yellow,"right")
+
+ update=function(dt)
+  if dead then return end
+  elapsed+=dt
+  local sp=.5+math.min(elapsed*.012,.7)
+  dist+=sp*dt*60
+  setScore(math.floor(dist)+bonus)
+  local mv=(held.right and 1 or 0)-(held.left and 1 or 0)
+  px=math.clamp(px+mv*.95*dt,roadL+pw/2+.01,roadL+roadW-pw/2-.01)
+  put(me,WW,px-pw/2,py,pw,ph)
+  me.Rotation=mv*6
+
+  for _,d in ipairs(dashes) do
+   d.y+=sp*dt
+   if d.y>1.1 then d.y-=1.2 end
+   put(d.f,WW,d.x,d.y,.012,.1)
+  end
+  for _,t in ipairs(trees) do
+   t.y+=sp*dt
+   if t.y>1.05 then t.y-=1.3 end
+   put(t.f,WW,t.x,t.y,.075,.06)
+  end
+
+  spawnT-=dt*(sp/.5)
+  if spawnT<=0 then
+   spawnT=math.max(.45,1.0-elapsed*.01)*(.8+math.random()*.4)
+   local l1=math.random(3)
+   spawnCar(l1)
+   if elapsed>12 and math.random()<.35 then
+    local l2=((l1+math.random(0,1))%3)+1
+    spawnCar(l2)
+   elseif math.random()<.35 then
+    spawnCoin(((l1+math.random(0,1))%3)+1)
+   end
+  end
+
+  for i=#obs,1,-1 do
+   local o=obs[i]
+   o.y+=sp*o.k*dt
+   put(o.f,WW,o.x-pw/2,o.y,pw,ph)
+   if rect(px-pw/2+.015,py+.025,pw-.03,ph-.05,o.x-pw/2+.015,o.y+.025,pw-.03,ph-.05) then
+    dead=true
+    sfx("boom")
+    later(.1,function() sfx("lose") end)
+    burst(f,UDim2.fromScale(px/WW,py+ph/2),C.orange,16,36)
+    me.Visible=false
+    later(.8,function() finish("TABRAKAN!") end)
+    return
+   end
+   if o.y>1.1 then
+    o.f:Destroy()
+    table.remove(obs,i)
+   end
+  end
+  for i=#coins,1,-1 do
+   local c=coins[i]
+   c.y+=sp*dt
+   put(c.f,WW,c.x-.025,c.y,.05,.05)
+   if rect(px-pw/2,py,pw,ph,c.x-.025,c.y,.05,.05) then
+    bonus+=25
+    sfx("coin")
+    popText(f,UDim2.fromScale(c.x/WW,c.y),"+25",C.yellow,16)
+    c.f:Destroy()
+    table.remove(coins,i)
+   elseif c.y>1.1 then
+    c.f:Destroy()
+    table.remove(coins,i)
+   end
+  end
+ end
+end
+
+---------------------------------------------------------------------
+-- 6 MINESWEEPER
+---------------------------------------------------------------------
+games[6]=function()
+ local COLS,ROWS,MINES=10,7,10
+ local f,L,R=field(COLS/ROWS)
+ f.BackgroundColor3=Color3.fromRGB(20,26,46)
+ local mine,rev,flag,cnt,cb={}, {}, {}, {}, {}
+ for x=1,COLS do
+  mine[x],rev[x],flag[x],cnt[x],cb[x]={}, {}, {}, {}, {}
+  for y=1,ROWS do mine[x][y]=false rev[x][y]=false flag[x][y]=false cnt[x][y]=0 end
+ end
+ local numCols={C.blue,C.green,C.red,C.purple,C.orange,C.cyan,C.pink,C.white}
+ local flagMode,placed,over=false,false,false
+ local revealed,flags=0,0
+ local score=0
+
+ local mineLbl=txt(L,"BOM\n"..MINES,UDim2.new(0,0,.5,-40),UDim2.new(1,0,0,80),22,C.yellow)
+ mineLbl.Font=Enum.Font.GothamBlack
+ local modeBtn
+ modeBtn=btn(R,"MODE:\nGALI",UDim2.new(0,0,.5,-45),UDim2.new(1,0,0,90),C.blue,function()
+  flagMode=not flagMode
+  modeBtn.Text=flagMode and "MODE:\nBENDERA" or "MODE:\nGALI"
+  modeBtn.BackgroundColor3=flagMode and C.red or C.blue
+  sfx("tap")
+ end,16)
+
+ local function nb(x,y,fn)
+  for dx=-1,1 do for dy=-1,1 do
+   if dx~=0 or dy~=0 then
+    local a,b=x+dx,y+dy
+    if a>=1 and a<=COLS and b>=1 and b<=ROWS then fn(a,b) end
+   end
+  end end
+ end
+ local function placeMines(sx,sy)
+  local n=0
+  while n<MINES do
+   local x,y=math.random(COLS),math.random(ROWS)
+   if not mine[x][y] and not (math.abs(x-sx)<=1 and math.abs(y-sy)<=1) then
+    mine[x][y]=true
+    n+=1
+   end
+  end
+  for x=1,COLS do for y=1,ROWS do
+   local c=0
+   nb(x,y,function(a,b) if mine[a][b] then c+=1 end end)
+   cnt[x][y]=c
+  end end
+ end
+ local function show(x,y)
+  local b=cb[x][y]
+  b.BackgroundColor3=Color3.fromRGB(22,30,52)
+  local c=cnt[x][y]
+  b.Text=c>0 and tostring(c) or ""
+  if c>0 then b.TextColor3=numCols[c] end
+ end
+ local function reveal(x0,y0)
+  local stack={{x0,y0}}
+  local opened=0
+  while #stack>0 do
+   local c=table.remove(stack)
+   local x,y=c[1],c[2]
+   if not rev[x][y] and not flag[x][y] then
+    rev[x][y]=true
+    opened+=1
+    revealed+=1
+    show(x,y)
+    if cnt[x][y]==0 then
+     nb(x,y,function(a,b) if not rev[a][b] then table.insert(stack,{a,b}) end end)
+    end
+   end
+  end
+  return opened
+ end
+ local function tap(x,y)
+  if over then return end
+  if flagMode then
+   if rev[x][y] then return end
+   flag[x][y]=not flag[x][y]
+   flags+=flag[x][y] and 1 or -1
+   cb[x][y].Text=flag[x][y] and "🚩" or ""
+   mineLbl.Text="BOM\n"..(MINES-flags)
+   sfx("tap",flag[x][y] and 1.5 or 1)
+   return
+  end
+  if flag[x][y] or rev[x][y] then return end
+  if not placed then placeMines(x,y) placed=true end
+  if mine[x][y] then
+   over=true
+   sfx("boom")
+   for a=1,COLS do for b=1,ROWS do
+    if mine[a][b] then
+     cb[a][b].Text="💣"
+     cb[a][b].BackgroundColor3=C.red
+    end
+   end end
+   later(.9,function() finish("BOOM!") end)
+   return
+  end
+  local n=reveal(x,y)
+  sfx(n>1 and "pop" or "tap",n>1 and 1 or 1.2)
+  score=revealed
+  setScore(score)
+  if revealed>=COLS*ROWS-MINES then
+   over=true
+   score+=50
+   setScore(score)
+   later(.5,function() finish("MENANG!",true) end)
+  end
+ end
+
+ for x=1,COLS do for y=1,ROWS do
+  local b=obj("TextButton",f,{
+   Position=UDim2.new((x-1)/COLS,1,(y-1)/ROWS,1),Size=UDim2.new(1/COLS,-2,1/ROWS,-2),
+   BackgroundColor3=Color3.fromRGB(62,80,122),BorderSizePixel=0,AutoButtonColor=true,
+   Text="",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=C.white,ZIndex=12
+  })
+  round(b,4)
+  obj("UITextSizeConstraint",b,{MaxTextSize=22})
+  b.Activated:Connect(function() tap(x,y) end)
+  cb[x][y]=b
+ end end
+end
+
+---------------------------------------------------------------------
+-- 7 WHACK-A-MOLE
+---------------------------------------------------------------------
+games[7]=function()
+ local f,L,R=field(1.45)
+ f.BackgroundColor3=Color3.fromRGB(86,170,80)
+ local moles={}
+ local score,timeLeft,elapsed,spawnT=0,30,0,.5
+ local timeLbl=txt(L,"WAKTU\n30",UDim2.new(0,0,.5,-40),UDim2.new(1,0,0,80),22,C.yellow)
+ timeLbl.Font=Enum.Font.GothamBlack
+ hint(R,"Pukul tikus!\nEmas = +3\nBom = -5",70)
+ local over=false
+
+ local function spawnMole(m,kind)
+  for _,c in ipairs(m.clip:GetChildren()) do c:Destroy() end
+  m.kind=kind
+  m.sprite=sprite(m.clip,moleRects(kind),14)
+  m.sprite.Size=UDim2.fromScale(1,.9)
+  m.pos=1
+  m.sprite.Position=UDim2.fromScale(0,1.05)
+  m.up=true
+  m.hit=false
+ end
+
+ for i=1,12 do
+  local cx=(i-1)%4
+  local cy=math.floor((i-1)/4)
+  local cell=obj("Frame",f,{Position=UDim2.new(cx/4,0,cy/3,0),Size=UDim2.new(1/4,0,1/3,0),BackgroundTransparency=1,ZIndex=11})
+  local hole=obj("Frame",cell,{Position=UDim2.fromScale(.1,.56),Size=UDim2.fromScale(.8,.28),BackgroundColor3=Color3.fromRGB(30,18,12),BorderSizePixel=0,ZIndex=12})
+  round(hole,999)
+  local clip=obj("Frame",cell,{Position=UDim2.fromScale(.12,.04),Size=UDim2.fromScale(.76,.66),BackgroundTransparency=1,ClipsDescendants=true,ZIndex=13})
+  local mound=obj("Frame",cell,{Position=UDim2.fromScale(.06,.66),Size=UDim2.fromScale(.88,.24),BackgroundColor3=Color3.fromRGB(120,78,44),BorderSizePixel=0,ZIndex=15})
+  round(mound,999)
+  local m={clip=clip,up=false,t=0,pos=1,hit=false,kind="normal"}
+  moles[i]=m
+  local tapB=obj("TextButton",cell,{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=20})
+  tapB.Activated:Connect(function()
+   if over then return end
+   if m.up and not m.hit then
+    m.hit=true
+    m.t=.18
+    local pos=UDim2.fromScale((cx+.5)/4,(cy+.4)/3)
+    if m.kind=="bomb" then
+     score=math.max(0,score-5)
+     sfx("boom")
+     burst(f,pos,C.red,14,36)
+     popText(f,pos,"-5",C.red,22)
+    elseif m.kind=="gold" then
+     score+=3
+     seq({{"coin",1,0},{"coin",1.3,.08}})
+     burst(f,pos,C.yellow,12,30)
+     popText(f,pos,"+3",C.yellow,22)
+    else
+     score+=1
+     sfx("hit",1+math.random()*.3)
+     burst(f,pos,Color3.fromRGB(150,100,60),8,24)
+     popText(f,pos,"+1",C.white,20)
+    end
+    setScore(score)
+   else
+    sfx("tap",.7)
+   end
+  end)
+ end
+
+ update=function(dt)
+  if over then return end
+  elapsed+=dt
+  timeLeft-=dt
+  timeLbl.Text="WAKTU\n"..math.max(0,math.ceil(timeLeft))
+  if timeLeft<=0 then
+   over=true
+   sfx("lose")
+   finish("WAKTU HABIS",score>=20)
+   return
+  end
+  local interval=math.max(.35,.85-elapsed*.015)
+  local stay=math.max(.5,1.0-elapsed*.012)
+  spawnT-=dt
+  if spawnT<=0 then
+   spawnT=interval
+   local upCount=0
+   local free={}
+   for i,m in ipairs(moles) do
+    if m.up then upCount+=1 elseif m.pos>.9 then table.insert(free,m) end
+   end
+   if upCount<3 and #free>0 then
+    local m=free[math.random(#free)]
+    local r=math.random()
+    spawnMole(m,r<.1 and "bomb" or (r<.2 and "gold" or "normal"))
+    m.t=stay
+    sfx("pop",.9)
+   end
+  end
+  for _,m in ipairs(moles) do
+   if m.up then
+    m.t-=dt
+    if m.t<=0 then m.up=false end
+   end
+   local target=m.up and 0 or 1
+   m.pos+=(target-m.pos)*math.min(1,dt*14)
+   if m.sprite and m.sprite.Parent then
+    m.sprite.Position=UDim2.fromScale(0,.1+m.pos*.95)
+   end
+  end
+ end
+end
+
+---------------------------------------------------------------------
+-- 8 TIC-TAC-TOE
+---------------------------------------------------------------------
+games[8]=function()
+ local f,L,R=field(1)
+ local WINS={{1,2,3},{4,5,6},{7,8,9},{1,4,7},{2,5,8},{3,6,9},{1,5,9},{3,5,7}}
+ local board={"","","","","","","","",""}
+ local tiles={}
+ local diff=2
+ local diffNames={"MUDAH","SEDANG","SULIT"}
+ local score,round_=0,0
+ local playerTurn,busy=true,false
+ local ended=false
+
+ local function winner(b)
+  for _,w in ipairs(WINS) do
+   if b[w[1]]~="" and b[w[1]]==b[w[2]] and b[w[2]]==b[w[3]] then return b[w[1]],w end
+  end
+  for i=1,9 do if b[i]=="" then return nil end end
+  return "D"
+ end
+ local function minimax(b,isO,depth)
+  local w=winner(b)
+  if w=="O" then return 10-depth elseif w=="X" then return depth-10 elseif w=="D" then return 0 end
+  local best=isO and -math.huge or math.huge
+  for i=1,9 do
+   if b[i]=="" then
+    b[i]=isO and "O" or "X"
+    local s=minimax(b,not isO,depth+1)
+    b[i]=""
+    if isO then best=math.max(best,s) else best=math.min(best,s) end
+   end
+  end
+  return best
+ end
+ local function aiPick()
+  local empty={}
+  for i=1,9 do if board[i]=="" then table.insert(empty,i) end end
+  local smart=(diff==3) or (diff==2 and math.random()<.6)
+  if not smart then return empty[math.random(#empty)] end
+  local bestS,cands=-math.huge,{}
+  for _,i in ipairs(empty) do
+   board[i]="O"
+   local s=minimax(board,false,1)
+   board[i]=""
+   if s>bestS then bestS=s cands={i} elseif s==bestS then table.insert(cands,i) end
+  end
+  return cands[math.random(#cands)]
+ end
+
+ local function refresh()
+  for i=1,9 do
+   tiles[i].Text=board[i]
+   tiles[i].TextColor3=(board[i]=="X") and C.blue or C.red
+  end
+ end
+ local startRound
+ local function check()
+  local w,line=winner(board)
+  if not w then return false end
+  ended=true
+  if line then
+   for _,i in ipairs(line) do tiles[i].BackgroundColor3=(w=="X") and Color3.fromRGB(40,120,80) or Color3.fromRGB(130,50,60) end
+  end
+  if w=="X" then
+   score+=10
+   setScore(score)
+   seq(WINSEQ)
+   popText(f,UDim2.fromScale(.5,.5),"MENANG +10",C.green,26)
+   later(1.2,function() startRound() end)
+  elseif w=="D" then
+   score+=3
+   setScore(score)
+   sfx("bad")
+   popText(f,UDim2.fromScale(.5,.5),"SERI +3",C.yellow,26)
+   later(1.2,function() startRound() end)
+  else
+   sfx("lose")
+   later(.9,function() finish("KALAH!") end)
+  end
+  return true
+ end
+ local function aiTurn()
+  if ended then return end
+  local i=aiPick()
+  if i then
+   board[i]="O"
+   refresh()
+   sfx("place",.8)
+  end
+  if not check() then
+   playerTurn=true
+   busy=false
+  end
+ end
+ startRound=function()
+  round_+=1
+  board={"","","","","","","","",""}
+  ended=false
+  for i=1,9 do tiles[i].BackgroundColor3=C.card end
+  refresh()
+  if round_%2==0 then
+   playerTurn=false
+   busy=true
+   later(.5,aiTurn)
+  else
+   playerTurn=true
+   busy=false
+  end
+ end
+
+ for i=1,9 do
+  local x=(i-1)%3
+  local y=math.floor((i-1)/3)
+  local b=obj("TextButton",f,{
+   Position=UDim2.new(x/3,3,y/3,3),Size=UDim2.new(1/3,-6,1/3,-6),
+   BackgroundColor3=C.card,BorderSizePixel=0,AutoButtonColor=false,
+   Text="",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=C.blue,ZIndex=12
+  })
+  round(b,10)
+  obj("UITextSizeConstraint",b,{MaxTextSize=56})
+  b.Activated:Connect(function()
+   if ended or busy or not playerTurn or board[i]~="" then return end
+   board[i]="X"
+   refresh()
+   sfx("place")
+   playerTurn=false
+   if not check() then
+    busy=true
+    later(.45,aiTurn)
+   end
+  end)
+  tiles[i]=b
+ end
+
+ local dBtn
+ dBtn=btn(L,"TINGKAT:\n"..diffNames[diff],UDim2.new(0,0,.5,-35),UDim2.new(1,0,0,70),C.purple,function()
+  diff=diff%3+1
+  dBtn.Text="TINGKAT:\n"..diffNames[diff]
+  sfx("tap")
+ end,15)
+ hint(R,"Menang +10\nSeri +3\nKalah = game over",70)
+ startRound()
+end
+
+---------------------------------------------------------------------
+-- 9 PIXEL PONG VS CPU
+---------------------------------------------------------------------
+games[9]=function()
+ local AR=1.6
+ local WW=AR
+ local f,L,R=field(AR)
+ f.BackgroundColor3=Color3.fromRGB(10,18,30)
+ for k=0,9 do
+  local d=obj("Frame",f,{BackgroundColor3=Color3.fromRGB(60,78,105),BorderSizePixel=0,ZIndex=11})
+  put(d,WW,WW/2-.004,k*.1+.02,.008,.06)
+ end
+ local PW,PH=.03,.2
+ local pX,cX=.04,WW-.04-PW
+ local py,cy=.4,.4
+ local pad1=obj("Frame",f,{BackgroundColor3=C.green,BorderSizePixel=0,ZIndex=14}) round(pad1,4)
+ local pad2=obj("Frame",f,{BackgroundColor3=C.red,BorderSizePixel=0,ZIndex=14}) round(pad2,4)
+ local rad=.022
+ local ball=obj("Frame",f,{BackgroundColor3=C.yellow,BorderSizePixel=0,ZIndex=16}) round(ball,999)
+ local trail={}
+ for i=1,3 do
+  local t=obj("Frame",f,{BackgroundColor3=C.yellow,BackgroundTransparency=.4+i*.15,BorderSizePixel=0,ZIndex=15})
+  round(t,999)
+  trail[i]={f=t,x=WW/2,y=.5}
+ end
+ local bx,by,vx,vy=WW/2,.5,0,0
+ local spd=.85
+ local sP,sC=0,0
+ local serveT=.9
+ local cpuOff=0
+ local score=0
+ local scoreLbl=txt(f,"0  -  0",UDim2.new(.3,0,0,2),UDim2.new(.4,0,0,26),20,C.dim)
+ scoreLbl.ZIndex=20
+
+ local function serve(dir)
+  bx,by=WW/2,.5
+  spd=.85
+  local ang=(math.random()-.5)*math.rad(50)
+  vx=dir*spd*math.cos(ang)
+  vy=spd*math.sin(ang)
+  serveT=.8
+ end
+ local function scoreUp(playerWon)
+  if playerWon then
+   sP+=1
+   score+=10
+   setScore(score)
+   sfx("ping")
+  else
+   sC+=1
+   sfx("bad")
+  end
+  scoreLbl.Text=sP.."  -  "..sC
+  if sP>=7 then
+   score+=50
+   setScore(score)
+   finish("MENANG!",true)
+  elseif sC>=7 then
+   sfx("lose")
+   finish("CPU MENANG")
+  else
+   serve(playerWon and 1 or -1)
+  end
+ end
+
+ local function setPy(io)
+  py=math.clamp((io.Position.Y-f.AbsolutePosition.Y)/f.AbsoluteSize.Y-PH/2,0,1-PH)
+ end
+ local drag=false
+ f.InputBegan:Connect(function(io) if isPointer(io) then drag=true setPy(io) end end)
+ f.InputChanged:Connect(function(io)
+  if drag and (io.UserInputType==Enum.UserInputType.Touch or io.UserInputType==Enum.UserInputType.MouseMovement) then setPy(io) end
+ end)
+ f.InputEnded:Connect(function(io) if isPointer(io) then drag=false end end)
+ holdBtn(L,"up",UDim2.new(0,0,.5,-76),UDim2.new(1,0,0,70),C.yellow,"up")
+ holdBtn(L,"down",UDim2.new(0,0,.5,6),UDim2.new(1,0,0,70),C.yellow,"down")
+ hint(R,"Geser di layar atau pakai tombol.\nPertama sampai 7 menang",70)
+
+ serve(1)
+ local trailT=0
+ update=function(dt)
+  local dy=(held.down and 1 or 0)-(held.up and 1 or 0)
+  if dy~=0 then py=math.clamp(py+dy*1.1*dt,0,1-PH) end
+  -- CPU
+  local cpuSpd=.5+sP*.04
+  local target
+  if vx>0 and serveT<=0 then target=by-PH/2+cpuOff else target=.4 end
+  cy+=math.clamp(target-cy,-cpuSpd*dt,cpuSpd*dt)
+  cy=math.clamp(cy,0,1-PH)
+  put(pad1,WW,pX,py,PW,PH)
+  put(pad2,WW,cX,cy,PW,PH)
+
+  if serveT>0 then
+   serveT-=dt
+  else
+   local sp=math.sqrt(vx*vx+vy*vy)
+   local n=math.max(1,math.ceil(sp*dt/.012))
+   local sdt=dt/n
+   for _=1,n do
+    bx+=vx*sdt
+    by+=vy*sdt
+    if by<rad then by=rad vy=math.abs(vy) sfx("tap",.8) end
+    if by>1-rad then by=1-rad vy=-math.abs(vy) sfx("tap",.8) end
+    -- paddle pemain
+    if vx<0 and bx-rad<=pX+PW and bx>pX-.01 and by>py-rad and by<py+PH+rad then
+     local off=math.clamp((by-(py+PH/2))/(PH/2),-1,1)
+     local ang=off*math.rad(55)
+     spd=math.min(spd*1.05,1.8)
+     vx=spd*math.cos(ang)
+     vy=spd*math.sin(ang)
+     bx=pX+PW+rad
+     cpuOff=(math.random()-.5)*.14
+     sfx("hit")
+    elseif vx>0 and bx+rad>=cX and bx<cX+PW+.01 and by>cy-rad and by<cy+PH+rad then
+     local off=math.clamp((by-(cy+PH/2))/(PH/2),-1,1)
+     local ang=off*math.rad(55)
+     spd=math.min(spd*1.04,1.8)
+     vx=-spd*math.cos(ang)
+     vy=spd*math.sin(ang)
+     bx=cX-rad
+     sfx("hit",1.15)
+    end
+    if bx<-.05 then scoreUp(false) return end
+    if bx>WW+.05 then scoreUp(true) return end
+   end
+  end
+  put(ball,WW,bx-rad,by-rad,rad*2,rad*2)
+  trailT+=dt
+  if trailT>.03 then
+   trailT=0
+   for i=#trail,2,-1 do trail[i].x,trail[i].y=trail[i-1].x,trail[i-1].y end
+   trail[1].x,trail[1].y=bx,by
+  end
+  for _,t in ipairs(trail) do put(t.f,WW,t.x-rad*.8,t.y-rad*.8,rad*1.6,rad*1.6) end
+ end
+end
+
+---------------------------------------------------------------------
+-- 10 TETRIS
+---------------------------------------------------------------------
+games[10]=function()
+ local W,H=10,18
+ local f,L,R=field(W/H)
+ local EMPTY=Color3.fromRGB(24,32,52)
+ local SH={
+  {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}},
+  {{1,1},{1,1}},
+  {{0,1,0},{1,1,1},{0,0,0}},
+  {{0,1,1},{1,1,0},{0,0,0}},
+  {{1,1,0},{0,1,1},{0,0,0}},
+  {{1,0,0},{1,1,1},{0,0,0}},
+  {{0,0,1},{1,1,1},{0,0,0}},
+ }
+ local COLORS={C.cyan,C.yellow,C.purple,C.green,C.red,C.blue,C.orange}
+ local grid,tiles={}, {}
+ for y=1,H do
+  grid[y]={}
+  tiles[y]={}
+  for x=1,W do
+   grid[y][x]=0
+   local t=obj("Frame",f,{
+    Position=UDim2.new((x-1)/W,1,(y-1)/H,1),Size=UDim2.new(1/W,-2,1/H,-2),
+    BackgroundColor3=EMPTY,BorderSizePixel=0,ZIndex=11
+   })
+   round(t,3)
+   tiles[y][x]=t
+  end
+ end
+
+ local function copy(m)
+  local r={}
+  for i,row in ipairs(m) do r[i]={} for j,v in ipairs(row) do r[i][j]=v end end
+  return r
+ end
+ local function rotCW(m)
+  local n=#m
+  local r={}
+  for i=1,n do
+   r[i]={}
+   for j=1,n do r[i][j]=m[n-j+1][i] end
+  end
+  return r
+ end
+ local bag={}
+ local function nextKind()
+  if #bag==0 then
+   for i=1,7 do bag[i]=i end
+   for i=7,2,-1 do
+    local j=math.random(i)
+    bag[i],bag[j]=bag[j],bag[i]
+   end
+  end
+  return table.remove(bag)
+ end
+ local function fits(m,x,y)
+  for r=1,#m do for c=1,#m do
+   if m[r][c]==1 then
+    local bx,by=x+c-1,y+r-1
+    if bx<1 or bx>W or by>H then return false end
+    if by>=1 and grid[by][bx]~=0 then return false end
+   end
+  end end
+  return true
+ end
+
+ local piece
+ local nextK=nextKind()
+ local score,lines,level=0,0,1
+ local dead,dirty=false,true
+ local fallT,lockT,repT,lastDir=0,0,0,0
+ local infoLbl
+
+ -- preview next
+ local nextBox=obj("Frame",R,{Size=UDim2.new(1,0,0,78),BackgroundColor3=C.field,BorderSizePixel=0,ZIndex=21})
+ round(nextBox,10)
+ stroke(nextBox,C.line,1.5)
+ local nl=txt(nextBox,"NEXT",UDim2.new(0,0,0,2),UDim2.new(1,0,0,14),11,C.dim)
+ nl.ZIndex=22
+ local mini={}
+ for r=1,4 do
+  mini[r]={}
+  for c=1,4 do
+   local m=obj("Frame",nextBox,{
+    AnchorPoint=Vector2.new(.5,0),
+    Position=UDim2.new(.5,(c-2.5)*12,0,18+(r-1)*12),Size=UDim2.fromOffset(11,11),
+    BackgroundTransparency=1,BorderSizePixel=0,ZIndex=22
+   })
+   round(m,2)
+   mini[r][c]=m
+  end
+ end
+ local function drawNext()
+  for r=1,4 do for c=1,4 do mini[r][c].BackgroundTransparency=1 end end
+  local m=SH[nextK]
+  local n=#m
+  local off=math.floor((4-n)/2)
+  for r=1,n do for c=1,n do
+   if m[r][c]==1 then
+    local cell=mini[r+off] and mini[r+off][c+off]
+    if cell then
+     cell.BackgroundTransparency=0
+     cell.BackgroundColor3=COLORS[nextK]
+    end
+   end
+  end end
+ end
+ local function updInfo()
+  if infoLbl then infoLbl.Text="NIVEL "..level.."\nBARIS "..lines end
+ end
+
+ local function spawn()
+  local k=nextK
+  nextK=nextKind()
+  local m=copy(SH[k])
+  local top=1
+  for r=1,#m do
+   local any=false
+   for c=1,#m do if m[r][c]==1 then any=true end end
+   if any then top=r break end
+  end
+  piece={m=m,x=math.floor((W-#m)/2)+1,y=2-top,k=k}
+  drawNext()
+  lockT,fallT=0,0
+  dirty=true
+  if not fits(piece.m,piece.x,piece.y) then
+   dead=true
+   sfx("lose")
+   later(.6,function() finish("GAME OVER") end)
+  end
+ end
+
+ local function draw()
+  for y=1,H do for x=1,W do
+   local v=grid[y][x]
+   tiles[y][x].BackgroundColor3=(v==0) and EMPTY or COLORS[v]
+  end end
+  if piece and not dead then
+   local gy=piece.y
+   while fits(piece.m,piece.x,gy+1) do gy+=1 end
+   for r=1,#piece.m do for c=1,#piece.m do
+    if piece.m[r][c]==1 then
+     local bx,by=piece.x+c-1,gy+r-1
+     if by>=1 and by<=H and bx>=1 and bx<=W and grid[by][bx]==0 then
+      tiles[by][bx].BackgroundColor3=COLORS[piece.k]:Lerp(EMPTY,.7)
+     end
+    end
+   end end
+   for r=1,#piece.m do for c=1,#piece.m do
+    if piece.m[r][c]==1 then
+     local bx,by=piece.x+c-1,piece.y+r-1
+     if by>=1 and by<=H and bx>=1 and bx<=W then
+      tiles[by][bx].BackgroundColor3=COLORS[piece.k]
+     end
+    end
+   end end
+  end
+ end
+
+ local function lock()
+  for r=1,#piece.m do for c=1,#piece.m do
+   if piece.m[r][c]==1 then
+    local bx,by=piece.x+c-1,piece.y+r-1
+    if by>=1 and by<=H and bx>=1 and bx<=W then grid[by][bx]=piece.k end
+   end
+  end end
+  local cleared=0
+  local y=H
+  while y>=1 do
+   local full=true
+   for x=1,W do if grid[y][x]==0 then full=false break end end
+   if full then
+    table.remove(grid,y)
+    local row={}
+    for x=1,W do row[x]=0 end
+    table.insert(grid,1,row)
+    cleared+=1
+   else
+    y-=1
+   end
+  end
+  if cleared>0 then
+   local pts={100,300,500,800}
+   score+=pts[cleared]*level
+   lines+=cleared
+   level=1+math.floor(lines/10)
+   local mul=1
+   for i=1,cleared do
+    task.delay((i-1)*.08,function() sfx("ping",mul+(i-1)*.18) end)
+   end
+   burst(f,UDim2.fromScale(.5,.5),C.yellow,10+cleared*4,50)
+   if cleared>=4 then popText(f,UDim2.fromScale(.5,.4),"TETRIS!",C.yellow,26) end
+   updInfo()
+  else
+   sfx("land")
+  end
+  setScore(score)
+  spawn()
+ end
+
+ local function tryMove(dx,dy)
+  if dead or not piece then return false end
+  if fits(piece.m,piece.x+dx,piece.y+dy) then
+   piece.x+=dx
+   piece.y+=dy
+   dirty=true
+   return true
+  end
+  return false
+ end
+ local function rotate()
+  if dead or not piece or piece.k==2 then return end
+  local m=rotCW(piece.m)
+  for _,dx in ipairs({0,-1,1,-2,2}) do
+   if fits(m,piece.x+dx,piece.y) then
+    piece.m=m
+    piece.x+=dx
+    dirty=true
+    lockT=0
+    sfx("tap",1.4)
+    return
+   end
+  end
+  if fits(m,piece.x,piece.y-1) then
+   piece.m=m
+   piece.y-=1
+   dirty=true
+   lockT=0
+   sfx("tap",1.4)
+  end
+ end
+ local function hardDrop()
+  if dead or not piece then return end
+  local n=0
+  while tryMove(0,1) do n+=1 end
+  score+=n*2
+  lock()
+ end
+
+ -- kontrol
+ infoLbl=txt(L,"",UDim2.new(0,0,0,0),UDim2.new(1,0,0,52),15,C.yellow)
+ infoLbl.Font=Enum.Font.GothamBlack
+ holdBtn(L,"down",UDim2.new(0,0,0,62),UDim2.new(1,0,0,56),C.blue,nil,"TURUN")
+ holdBtn(L,"left",UDim2.new(0,0,1,-72),UDim2.new(.5,-3,0,70),C.yellow,"left")
+ holdBtn(L,"right",UDim2.new(.5,3,1,-72),UDim2.new(.5,-3,0,70),C.yellow,"right")
+ btn(R,"PUTAR",UDim2.new(0,0,0,86),UDim2.new(1,0,0,58),C.green,rotate,16)
+ btn(R,"JATUH",UDim2.new(0,0,0,150),UDim2.new(1,0,0,58),C.red,hardDrop,16)
+ keyTap[Enum.KeyCode.W]=rotate
+ keyTap[Enum.KeyCode.Up]=rotate
+ keyTap[Enum.KeyCode.Space]=hardDrop
+
+ spawn()
+ updInfo()
+ update=function(dt)
+  if dead then return end
+  local dirx=(held.left and not held.right) and -1 or ((held.right and not held.left) and 1 or 0)
+  if dirx~=lastDir then
+   lastDir=dirx
+   if dirx~=0 then
+    if tryMove(dirx,0) then sfx("tap") lockT=0 end
+    repT=.16
+   end
+  elseif dirx~=0 then
+   repT-=dt
+   if repT<=0 then
+    repT=.055
+    if tryMove(dirx,0) then lockT=0 end
+   end
+  end
+  local interval=held.down and .045 or math.max(.07,.62-(level-1)*.055)
+  fallT+=dt
+  if fallT>=interval then
+   fallT=0
+   if tryMove(0,1) then
+    if held.down then score+=1 setScore(score) end
+    lockT=0
+   end
+  end
+  if piece and not fits(piece.m,piece.x,piece.y+1) then
+   lockT+=dt
+   if lockT>=.45 or (held.down and lockT>=.05) then lock() end
+  else
+   lockT=0
+  end
+  if dirty then
+   dirty=false
+   draw()
+  end
+ end
+end
+
+---------------------------------------------------------------------
+-- 11 BLOCK BLAST
+---------------------------------------------------------------------
+games[11]=function()
+ local N,GAP=8,3
+ local EMPTY=Color3.fromRGB(46,52,104)
+ local PALETTE={
+  Color3.fromRGB(235,70,70),Color3.fromRGB(245,150,50),
+  Color3.fromRGB(245,205,50),Color3.fromRGB(80,200,100),
+  Color3.fromRGB(60,150,235),Color3.fromRGB(150,90,220),
+  Color3.fromRGB(235,100,170),
+ }
+ local RAW={
+  {"X"},
+  {"XX"},{"X","X"},
+  {"XXX"},{"X","X","X"},
+  {"XXXX"},{"X","X","X","X"},
+  {"XXXXX"},{"X","X","X","X","X"},
+  {"XX","XX"},{"XXX","XXX","XXX"},
+  {"XXX","XXX"},{"XX","XX","XX"},
+  {"XX","X."},{"XX",".X"},{"X.","XX"},{".X","XX"},
+  {"X..","X..","XXX"},{"..X","..X","XXX"},
+  {"XXX","X..","X.."},{"XXX","..X","..X"},
+  {"X.","X.","XX"},{".X",".X","XX"},
+  {"XX","X.","X."},{"XX",".X",".X"},
+  {"XXX",".X."},{".X.","XXX"},{"X.","XX","X."},{".X","XX",".X"},
+  {".XX","XX."},{"XX.",".XX"},{"X.","XX",".X"},{".X","XX","X."},
+ }
+ local SHAPES={}
+ for _,rows in ipairs(RAW) do
+  local cl={}
+  for r,row in ipairs(rows) do
+   for c=1,#row do
+    if row:sub(c,c)=="X" then table.insert(cl,{r-1,c-1}) end
+   end
+  end
+  table.insert(SHAPES,{cells=cl,h=#rows,w=#rows[1]})
+ end
+
+ local myId=runId
+ local function alive() return myId==runId end
+
+ local grid={}
+ for r=1,N do
+  grid[r]={}
+  for c=1,N do grid[r][c]=false end
+ end
+ local slots={}
+ local score,combo=0,0
+ local busy,isOver=false,false
+ local drag=nil
+ local cs,boardPx=20,0
+ local slotW,slotH=80,80
+
+ local root=obj("Frame",stage,{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,ZIndex=10})
+ local board=obj("Frame",root,{BackgroundColor3=Color3.fromRGB(30,36,78),BorderSizePixel=0,ZIndex=11})
+ round(board,10)
+ stroke(board,C.line,2)
+ local cells={}
+ for r=1,N do
+  cells[r]={}
+  for c=1,N do
+   local cell=obj("Frame",board,{BackgroundColor3=EMPTY,BorderSizePixel=0,ZIndex=12})
+   round(cell,4)
+   cells[r][c]=cell
+  end
+ end
+ local slotFrames,trayPieces={}, {}
+
+ local function buildPiece(piece,size,gap,z)
+  local sh=piece.shape
+  local fr=obj("Frame",nil,{
+   BackgroundTransparency=1,ZIndex=z,
+   Size=UDim2.fromOffset(sh.w*(size+gap)-gap,sh.h*(size+gap)-gap)
+  })
+  for _,cl in ipairs(sh.cells) do
+   local c=obj("Frame",fr,{
+    Size=UDim2.fromOffset(size,size),
+    Position=UDim2.fromOffset(cl[2]*(size+gap),cl[1]*(size+gap)),
+    BackgroundColor3=piece.color,BorderSizePixel=0,ZIndex=z
+   })
+   round(c,4)
+  end
+  return fr
+ end
+
+ local function canPlace(shape,row,col)
+  for _,cl in ipairs(shape.cells) do
+   local r,c=row+cl[1],col+cl[2]
+   if r<1 or r>N or c<1 or c>N or grid[r][c] then return false end
+  end
+  return true
+ end
+ local function fitsAnywhere(shape)
+  for r=1,N do for c=1,N do
+   if canPlace(shape,r,c) then return true end
+  end end
+  return false
+ end
+ local function findLines(extra)
+  local function filled(r,c) return grid[r][c] or (extra and extra[r*16+c]) end
+  local rows,cols={}, {}
+  for r=1,N do
+   local full=true
+   for c=1,N do if not filled(r,c) then full=false break end end
+   if full then rows[#rows+1]=r end
+  end
+  for c=1,N do
+   local full=true
+   for r=1,N do if not filled(r,c) then full=false break end end
+   if full then cols[#cols+1]=c end
+  end
+  return rows,cols
+ end
+
+ local function renderBoard(prev)
+  local extra,hl=nil,{}
+  if prev then
+   extra={}
+   for _,cl in ipairs(prev.piece.shape.cells) do
+    extra[(prev.row+cl[1])*16+prev.col+cl[2]]=true
+   end
+   local rows,cols=findLines(extra)
+   for _,r in ipairs(rows) do for c=1,N do hl[r*16+c]=true end end
+   for _,c in ipairs(cols) do for r=1,N do hl[r*16+c]=true end end
+  end
+  for r=1,N do for c=1,N do
+   local col=grid[r][c] or EMPTY
+   if prev then
+    local k=r*16+c
+    if extra[k] then
+     col=prev.piece.color
+    elseif hl[k] and grid[r][c] then
+     col=grid[r][c]:Lerp(C.white,.55)
+    end
+   end
+   cells[r][c].BackgroundColor3=col
+  end end
+ end
+
+ local function renderTray()
+  for i=1,3 do
+   if trayPieces[i] then trayPieces[i]:Destroy() trayPieces[i]=nil end
+   local p=slots[i]
+   if p and slotFrames[i] then
+    local size=math.min(cs*.85,(slotW-16+2)/p.shape.w-2,(slotH-12+2)/p.shape.h-2)
+    size=math.max(8,math.floor(size))
+    local fr=buildPiece(p,size,2,13)
+    fr.AnchorPoint=Vector2.new(.5,.5)
+    fr.Position=UDim2.fromScale(.5,.5)
+    fr.Parent=slotFrames[i]
+    trayPieces[i]=fr
+   end
+  end
+ end
+
+ local function layout()
+  local Wd,Hd=stage.AbsoluteSize.X,stage.AbsoluteSize.Y
+  if Wd<50 or Hd<50 then return end
+  local pad=6
+  local bx,by
+  if Wd>=Hd*1.15 then
+   boardPx=math.min(Hd-pad*2,Wd*.5)
+   cs=math.max(10,math.floor((boardPx-GAP*(N+1))/N))
+   boardPx=cs*N+GAP*(N+1)
+   local gap=18
+   local trayW=math.min(280,Wd-boardPx-gap-pad*2)
+   local groupW=boardPx+gap+trayW
+   bx=(Wd-groupW)/2
+   by=(Hd-boardPx)/2
+   slotW=trayW
+   slotH=(boardPx-16)/3
+   for i=1,3 do
+    slotFrames[i].Size=UDim2.fromOffset(slotW,slotH)
+    slotFrames[i].Position=UDim2.fromOffset(bx+boardPx+gap,by+(i-1)*(slotH+8))
+   end
+  else
+   boardPx=math.min(Wd-pad*2,Hd*.62)
+   cs=math.max(10,math.floor((boardPx-GAP*(N+1))/N))
+   boardPx=cs*N+GAP*(N+1)
+   bx=(Wd-boardPx)/2
+   by=pad
+   slotW=(Wd-pad*2-16)/3
+   slotH=math.max(40,Hd-by-boardPx-pad*2)
+   for i=1,3 do
+    slotFrames[i].Size=UDim2.fromOffset(slotW,slotH)
+    slotFrames[i].Position=UDim2.fromOffset(pad+(i-1)*(slotW+8),by+boardPx+pad)
+   end
+  end
+  board.Position=UDim2.fromOffset(bx,by)
+  board.Size=UDim2.fromOffset(boardPx,boardPx)
+  for r=1,N do for c=1,N do
+   local cell=cells[r][c]
+   cell.Size=UDim2.fromOffset(cs,cs)
+   cell.Position=UDim2.fromOffset(GAP+(c-1)*(cs+GAP),GAP+(r-1)*(cs+GAP))
+  end end
+  renderTray()
+ end
+
+ for i=1,3 do
+  local s=obj("TextButton",root,{
+   Text="",AutoButtonColor=false,BackgroundColor3=Color3.fromRGB(38,44,90),
+   BackgroundTransparency=.25,BorderSizePixel=0,ZIndex=12
+  })
+  round(s,12)
+  stroke(s,C.line,1.5,.4)
+  slotFrames[i]=s
+ end
+
+ local function newPieces()
+  for _=1,30 do
+   for i=1,3 do
+    slots[i]={shape=SHAPES[math.random(#SHAPES)],color=PALETTE[math.random(#PALETTE)]}
+   end
+   for i=1,3 do
+    if fitsAnywhere(slots[i].shape) then return end
+   end
+  end
+ end
+
+ local function checkGameOver()
+  for i=1,3 do
+   if slots[i] and fitsAnywhere(slots[i].shape) then return end
+  end
+  isOver=true
+  sfx("lose")
+  later(.5,function() finish("GAME OVER") end)
+ end
+
+ local function place(i,row,col)
+  busy=true
+  local p=slots[i]
+  sfx("place")
+  for _,cl in ipairs(p.shape.cells) do
+   grid[row+cl[1]][col+cl[2]]=p.color
+  end
+  slots[i]=nil
+  score+=#p.shape.cells
+  renderBoard()
+  renderTray()
+
+  local rows,cols=findLines()
+  local n=#rows+#cols
+  if n>0 then
+   combo+=1
+   local clr={}
+   for _,r in ipairs(rows) do for c=1,N do clr[r*16+c]=true end end
+   for _,c in ipairs(cols) do for r=1,N do clr[r*16+c]=true end end
+   for k in pairs(clr) do cells[k//16][k%16].BackgroundColor3=C.white end
+   local beeps=math.min(n+combo-1,6)
+   for b=1,beeps do
+    task.delay((b-1)*.07,function() sfx("ping",1+.12*(b-1)) end)
+   end
+   task.wait(.15)
+   if not alive() then return end
+   for k in pairs(clr) do
+    local rr,cc=k//16,k%16
+    burst(root,UDim2.fromOffset(board.Position.X.Offset+GAP+(cc-1)*(cs+GAP)+cs/2,board.Position.Y.Offset+GAP+(rr-1)*(cs+GAP)+cs/2),grid[rr][cc] or C.white,3,18)
+    grid[rr][cc]=false
+   end
+   local gain=n*n*10+(combo-1)*10
+   score+=gain
+   local empty=true
+   for r=1,N do for c=1,N do if grid[r][c] then empty=false end end end
+   if empty then
+    score+=300
+    gain+=300
+    seq(WINSEQ)
+   end
+   local msg=""
+   if n>=2 then msg=n.." GARIS! " end
+   msg=msg.."+"..gain
+   if combo>1 then msg=msg.."  COMBO x"..combo end
+   if empty then msg="PERFECT! "..msg end
+   popText(root,UDim2.new(0,board.Position.X.Offset+boardPx/2,0,board.Position.Y.Offset+boardPx/2),msg,C.yellow,20)
+  else
+   combo=0
+  end
+
+  renderBoard()
+  setScore(score)
+  if not (slots[1] or slots[2] or slots[3]) then newPieces() end
+  renderTray()
+  busy=false
+  checkGameOver()
+ end
+
+ -- drag & drop
+ local function toScreen(io)
+  return Vector2.new(io.Position.X,io.Position.Y)+GuiService:GetGuiInset()
+ end
+ local function moveDrag(pos)
+  local p=drag.piece
+  local sh=p.shape
+  local pw=sh.w*(cs+GAP)-GAP
+  local ph=sh.h*(cs+GAP)-GAP
+  local lift=0
+  if drag.touch then
+   lift=math.clamp((gui.AbsoluteSize.Y-pos.Y)/2,0,cs*2)
+  end
+  local tlx,tly=pos.X-pw/2,pos.Y-ph/2-lift
+  drag.frame.Position=UDim2.fromOffset(tlx,tly)
+  drag.pos=pos
+  local bp=board.AbsolutePosition
+  local fc=(tlx-bp.X-GAP)/(cs+GAP)+1
+  local fr=(tly-bp.Y-GAP)/(cs+GAP)+1
+  local c0,r0=math.floor(fc+.5),math.floor(fr+.5)
+  local bestD,bestR,bestC=1.6,nil,nil
+  for dr=-1,1 do for dc=-1,1 do
+   local r,c=r0+dr,c0+dc
+   local dist=(fr-r)^2+(fc-c)^2
+   if dist<bestD and canPlace(sh,r,c) then bestD,bestR,bestC=dist,r,c end
+  end end
+  local key
+  if bestR then
+   key=bestR..","..bestC
+   drag.target={bestR,bestC}
+  else
+   drag.target=nil
+  end
+  if key~=drag.key then
+   drag.key=key
+   if drag.target then renderBoard({piece=p,row=bestR,col=bestC}) else renderBoard() end
+  end
+ end
+ local function startDrag(i,io)
+  if drag or busy or isOver or finished then return end
+  local ty=io.UserInputType
+  if ty~=Enum.UserInputType.Touch and ty~=Enum.UserInputType.MouseButton1 then return end
+  local p=slots[i]
+  if not p then return end
+  sfx("pop",1.3)
+  local fr=buildPiece(p,cs,GAP,60)
+  fr.Parent=gui
+  drag={slot=i,piece=p,frame=fr,input=io,touch=(ty==Enum.UserInputType.Touch)}
+  if trayPieces[i] then trayPieces[i].Visible=false end
+  moveDrag(toScreen(io))
+ end
+ local function endDrag()
+  local d=drag
+  drag=nil
+  d.frame:Destroy()
+  renderBoard()
+  if d.target then
+   task.spawn(place,d.slot,d.target[1],d.target[2])
+  else
+   if trayPieces[d.slot] then trayPieces[d.slot].Visible=true end
+   local p=d.pos
+   if p then
+    local bp,bs=board.AbsolutePosition,board.AbsoluteSize
+    if p.X>bp.X and p.X<bp.X+bs.X and p.Y>bp.Y and p.Y<bp.Y+bs.Y then sfx("bad") end
+   end
+  end
+ end
+ table.insert(connections,UIS.InputChanged:Connect(function(io)
+  if not drag then return end
+  if drag.touch then
+   if io==drag.input then moveDrag(toScreen(io)) end
+  elseif io.UserInputType==Enum.UserInputType.MouseMovement then
+   moveDrag(toScreen(io))
+  end
+ end))
+ table.insert(connections,UIS.InputEnded:Connect(function(io)
+  if not drag then return end
+  if drag.touch then
+   if io==drag.input then endDrag() end
+  elseif io.UserInputType==Enum.UserInputType.MouseButton1 then
+   endDrag()
+  end
+ end))
+ for i=1,3 do
+  slotFrames[i].InputBegan:Connect(function(io) startDrag(i,io) end)
+ end
+
+ clean=function()
+  if drag then
+   drag.frame:Destroy()
+   drag=nil
+  end
+ end
+
+ table.insert(connections,stage:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+  layout()
+  renderBoard()
+ end))
+ newPieces()
+ layout()
+ renderBoard()
+ renderTray()
+ task.defer(function()
+  if alive() then
+   layout()
+   renderBoard()
+  end
+ end)
+end
+
+---------------------------------------------------------------------
+-- MENU, START, LOOP
+---------------------------------------------------------------------
+for i=1,#names do
+ local card=obj("TextButton",menu,{Text="",BackgroundColor3=C.card,AutoButtonColor=true,BorderSizePixel=0,LayoutOrder=i,ZIndex=8})
+ round(card,12)
+ stroke(card,C.line,1.5,.4)
+ local ac=obj("Frame",card,{Size=UDim2.new(0,5,1,-16),Position=UDim2.new(0,8,0,8),BackgroundColor3=accents[i],BorderSizePixel=0,ZIndex=9})
+ round(ac,3)
+ obj("TextLabel",card,{
+  Text=icons[i],Position=UDim2.new(0,18,0,0),Size=UDim2.new(0,46,1,0),
+  BackgroundTransparency=1,TextSize=30,Font=Enum.Font.GothamBold,TextColor3=C.white,ZIndex=9
+ })
+ txt(card,names[i],UDim2.new(0,66,0,6),UDim2.new(1,-72,0,32),13,C.white,Enum.TextXAlignment.Left).ZIndex=9
+ txt(card,descs[i],UDim2.new(0,66,0,38),UDim2.new(1,-72,0,16),10,C.dim,Enum.TextXAlignment.Left).ZIndex=9
+ local bl=txt(card,"TERBAIK 0",UDim2.new(0,66,1,-24),UDim2.new(1,-72,0,16),11,C.yellow,Enum.TextXAlignment.Left)
+ bl.ZIndex=9
+ bestLbls[i]=bl
+ card.Activated:Connect(function()
+  sfx("click")
+  start(i)
+ end)
+end
+local function refreshMenu()
+ for i=1,#names do bestLbls[i].Text="TERBAIK "..(bests[i] or 0) end
+end
+
+showMenu=function()
+ clear()
+ runId+=1
+ area.Visible=false
+ menu.Visible=true
+ unbindKeys()
+ refreshMenu()
+end
+
+start=function(i)
+ clear()
+ runId+=1
+ finished=false
+ curIndex=i
+ hudName.Text=names[i]
+ menu.Visible=false
+ area.Visible=true
+ setScore(0)
+ if panel.Visible then bindKeys() end
+ local ok,err=pcall(games[i])
+ if not ok then
+  warn("Pixel Arcade error:",err)
+  clear()
+  txt(stage,"GAME ERROR\n"..tostring(err):sub(1,90),UDim2.new(.1,0,.3,0),UDim2.new(.8,0,.4,0),14,C.red)
+ end
+end
+
+local hb=RunService.Heartbeat:Connect(function(dt)
+ if update and panel.Visible and area.Visible then
+  local ok,err=pcall(update,math.min(dt,.05))
+  if not ok then
+   warn("Pixel Arcade update error:",err)
+   update=nil
+  end
+ end
 end)
 
-UIS.InputChanged:Connect(function(input)
-    if currentGame ~= "brick" or hidden then return end
-
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseMovement then
-        if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-            or input.UserInputType == Enum.UserInputType.Touch then
-            movePaddleFromScreenX(input.Position.X)
-        end
-    end
+gui.Destroying:Connect(function()
+ hb:Disconnect()
+ unbindKeys()
+ pcall(clear)
 end)
 
--- Keyboard paddle control for computer
-UIS.InputBegan:Connect(function(input, processed)
-    if processed or hidden then return end
-    if currentGame == "brick" then
-        if input.KeyCode == Enum.KeyCode.Left then paddleDir = -1 end
-        if input.KeyCode == Enum.KeyCode.Right then paddleDir = 1 end
-        if input.KeyCode == Enum.KeyCode.Space then ballStarted = true end
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Left and paddleDir == -1 then paddleDir = 0 end
-    if input.KeyCode == Enum.KeyCode.Right and paddleDir == 1 then paddleDir = 0 end
-end)
-
--- =====================================================
--- NAVIGATION
--- =====================================================
-
-local function showMenu()
-    currentGame = "menu"
-    menu.Visible = true
-    flappy.Visible = false
-    snakeGame.Visible = false
-    brickGame.Visible = false
-    back.Visible = false
-end
-
-local function startFlappy()
-    currentGame = "flappy"
-    menu.Visible = false
-    flappy.Visible = true
-    snakeGame.Visible = false
-    brickGame.Visible = false
-    back.Visible = true
-    resetFlappy()
-end
-
-local function startSnake()
-    currentGame = "snake"
-    menu.Visible = false
-    flappy.Visible = false
-    snakeGame.Visible = true
-    brickGame.Visible = false
-    back.Visible = true
-    resetSnake()
-end
-
-local function startBrick()
-    currentGame = "brick"
-    menu.Visible = false
-    flappy.Visible = false
-    snakeGame.Visible = false
-    brickGame.Visible = true
-    back.Visible = true
-    resetBrick()
-end
-
-flappyPick.Activated:Connect(startFlappy)
-snakePick.Activated:Connect(startSnake)
-brickPick.Activated:Connect(startBrick)
-back.Activated:Connect(showMenu)
-
--- =====================================================
--- DRAGGABLE OPEN/CLOSE BUTTON
--- =====================================================
-
-local dragging = false
-local moved = false
-local dragStart
-local startPos
-
-toggle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        moved = false
-        dragStart = input.Position
-        startPos = toggle.Position
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if not dragging then return end
-
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-
-        if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then
-            moved = true
-        end
-
-        if moved then
-            local cam = workspace.CurrentCamera
-            if cam then
-                local view = cam.ViewportSize
-                local x = math.clamp(
-                    startPos.X.Offset + delta.X,
-                    0,
-                    view.X - toggle.AbsoluteSize.X
-                )
-                local y = math.clamp(
-                    startPos.Y.Offset + delta.Y,
-                    0,
-                    view.Y - toggle.AbsoluteSize.Y
-                )
-                toggle.Position = UDim2.fromOffset(x, y)
-            end
-        end
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if not dragging then return end
-
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-
-        if not moved then
-            hidden = not hidden
-            root.Visible = not hidden
-            toggle.Text = hidden and "▶" or "—"
-        end
-
-        dragStart = nil
-        startPos = nil
-    end
-end)
-
--- =====================================================
--- MAIN UPDATE LOOP
--- =====================================================
-
-RunService.RenderStepped:Connect(function(dt)
-    if hidden or not root.Visible then return end
-
-    -- FLAPPY UPDATE
-    if currentGame == "flappy" and fAlive and fStarted then
-        local cam = workspace.CurrentCamera
-        if not cam then return end
-
-        local v = cam.ViewportSize
-        local groundY = v.Y - 42
-
-        fVel += 1250 * dt
-        fY += fVel * dt / v.Y
-        bird.Position = UDim2.fromScale(0.25, fY)
-        bird.Rotation = math.clamp(fVel / 15, -25, 80)
-
-        local bx, by = v.X * 0.25, fY * v.Y
-        local bw, bh = bird.AbsoluteSize.X, bird.AbsoluteSize.Y
-
-        if by <= 0 or by + bh >= groundY then
-            endFlappy()
-        end
-
-        fTimer += dt
-        if fTimer >= math.max(0.75, 0.95 * v.X / fSpeed) then
-            fTimer = 0
-            spawnPipe()
-        end
-
-        for i = #fPipes, 1, -1 do
-            local p = fPipes[i]
-            p.x -= fSpeed * dt
-            p.top.Position = UDim2.fromOffset(p.x, 0)
-            p.cap1.Position = UDim2.fromOffset(p.x - 5, p.top.AbsoluteSize.Y - 22)
-            p.bottom.Position = UDim2.fromOffset(p.x, p.center + p.gap / 2)
-            p.cap2.Position = UDim2.fromOffset(p.x - 5, p.center + p.gap / 2)
-
-            if bx + bw > p.x and bx < p.x + p.w then
-                if by < p.center - p.gap / 2
-                    or by + bh > p.center + p.gap / 2 then
-                    endFlappy()
-                end
-            end
-
-            if not p.scored and p.x + p.w < bx then
-                p.scored = true
-                fScore += 1
-                fScoreLabel.Text = tostring(fScore)
-
-                local stage = math.floor(fScore / 5) + 1
-                if stage ~= fStage then
-                    fStage = stage
-                    fSpeed = 230 + (fStage - 1) * 25
-                    fStageLabel.Text = "STAGE " .. fStage
-                end
-            end
-
-            if p.x + p.w < -20 then
-                p.top:Destroy()
-                p.bottom:Destroy()
-                p.cap1:Destroy()
-                p.cap2:Destroy()
-                table.remove(fPipes, i)
-            end
-        end
-
-    elseif currentGame == "flappy" and fAlive and not fStarted then
-        bird.Position = UDim2.fromScale(
-            0.25, 0.45 + math.sin(os.clock() * 3) * 0.012
-        )
-
-    -- SNAKE UPDATE
-    elseif currentGame == "snake" and sAlive then
-        local cam = workspace.CurrentCamera
-        if cam then
-            local v = cam.ViewportSize
-            local size = math.max(180, math.floor(math.min(v.X * 0.53, v.Y * 0.62)))
-            board.Size = UDim2.fromOffset(size, size)
-            sOver.Position = board.Position
-        end
-
-        sTimer += dt
-        if sTimer >= sStep then
-            sTimer -= sStep
-            dir = {x = nextDir.x, y = nextDir.y}
-
-            local head = snake[1]
-            local newHead = {x = head.x + dir.x, y = head.y + dir.y}
-
-            if newHead.x < 1 or newHead.x > GRID
-                or newHead.y < 1 or newHead.y > GRID then
-                sAlive = false
-            else
-                local eating = same(newHead, food)
-                local limit = eating and #snake or (#snake - 1)
-
-                for i = 1, limit do
-                    if same(snake[i], newHead) then
-                        sAlive = false
-                        break
-                    end
-                end
-
-                if sAlive then
-                    table.insert(snake, 1, newHead)
-                    if eating then
-                        sScore += 1
-                        sStep = math.max(0.075, 0.15 - sScore * 0.002)
-                        placeFood()
-                    else
-                        table.remove(snake)
-                    end
-                end
-            end
-
-            if not sAlive then
-                sFinal.Text = "Skor: " .. sScore
-                sOver.Visible = true
-            end
-
-            renderSnake()
-        end
-
-    -- BRICK BREAKER UPDATE
-    elseif currentGame == "brick" and bAlive then
-        local size = playArea.AbsoluteSize
-        if size.X <= 0 or size.Y <= 0 then return end
-
-        paddleX = math.clamp(paddleX + paddleDir * dt * 0.8, 0.12, 0.88)
-        paddle.Position = UDim2.new(paddleX, 0, 0.91, 0)
-
-        if not ballStarted then
-            ballX = paddleX
-            ballY = 0.78
-            ball.Position = UDim2.fromScale(ballX, ballY)
-            return
-        end
-
-        local oldX, oldY = ballX, ballY
-        ballX += ballVX * dt
-        ballY += ballVY * dt
-
-        local radiusX = 7 / size.X
-        local radiusY = 7 / size.Y
-
-        if ballX <= radiusX then
-            ballX = radiusX
-            ballVX = math.abs(ballVX)
-        elseif ballX >= 1 - radiusX then
-            ballX = 1 - radiusX
-            ballVX = -math.abs(ballVX)
-        end
-
-        if ballY <= radiusY then
-            ballY = radiusY
-            ballVY = math.abs(ballVY)
-        end
-
-        -- Paddle collision
-        local paddleY = 0.91
-        if ballVY > 0
-            and oldY + radiusY <= paddleY
-            and ballY + radiusY >= paddleY - 0.025
-            and math.abs(ballX - paddleX) < 0.14 then
-            ballY = paddleY - 0.025
-            ballVY = -math.abs(ballVY)
-            ballVX = math.clamp((ballX - paddleX) * 2.5, -0.65, 0.65)
-        end
-
-        -- Brick collision
-        for _, brick in ipairs(bricks) do
-            if brick.alive and brick.frame.Parent then
-                local bx = brick.frame.Position.X.Offset
-                local by = brick.frame.Position.Y.Offset
-                local bw = brick.frame.AbsoluteSize.X
-                local bh = brick.frame.AbsoluteSize.Y
-
-                local px = ballX * size.X
-                local py = ballY * size.Y
-
-                if px + 7 >= bx and px - 7 <= bx + bw
-                    and py + 7 >= by and py - 7 <= by + bh then
-                    brick.alive = false
-                    brick.frame:Destroy()
-                    bScore += 10
-                    bScoreLabel.Text = "SKOR: " .. bScore
-                    ballVY = -ballVY
-                    break
-                end
-            end
-        end
-
-        if ballY > 1 then
-            bLives -= 1
-            bLivesLabel.Text = "NYAWA: " .. bLives
-
-            if bLives <= 0 then
-                finishBrick()
-            else
-                ballX, ballY = paddleX, 0.78
-                ballVX, ballVY = 0.34, -0.48
-                ballStarted = false
-            end
-        end
-
-        ball.Position = UDim2.fromScale(ballX, ballY)
-
-        local remaining = 0
-        for _, brick in ipairs(bricks) do
-            if brick.alive then remaining += 1 end
-        end
-
-        if remaining == 0 then
-            finishBrick()
-        end
-    end
-end)
-
--- Start in menu
-showMenu()
-resetFlappy()
-resetSnake()
-resetBrick()
+refreshMenu()
+print("PIXEL ARCADE HUB V5 loaded!")
